@@ -9,9 +9,20 @@ An unofficial command-line tool and MCP server for the [ServiceTitan REST API v2
 
 ### Intended integration path: Customer-Built Apps only
 
-ServiceTitan documents several integration paths in [Integration Paths](https://developer.servicetitan.io/integration-paths). **Use this repo only for the "Customer-Built Apps" path** — i.e. a ServiceTitan customer building an internal tool against their own tenant.
+ServiceTitan defines three integration paths in [Customer Integration Paths](https://developer.servicetitan.io/integration-paths):
 
-Other paths (apps distributed to additional ServiceTitan customers, e.g. Integrator/Marketplace apps) involve onboarding, review, and distribution requirements that this CLI does not satisfy. If you intend to ship something to other ServiceTitan customers, follow ServiceTitan's official path on the link above instead of using this project as a basis for distribution.
+- **Certified Apps** *(Best Practice)* — built by a third party, reviewed by ServiceTitan, distributed via [marketplace.servicetitan.com](https://marketplace.servicetitan.com). Customers don't share App Keys.
+- **Customer-Built Apps** *(Supported)* — *"created, hosted, and maintained by you. You can use your own App Keys to connect your integration software to ServiceTitan, without sharing those keys with external software you don't control."*
+- **Tunneled Apps** *(Not Allowed)* — a third party gets access to your App Key. Identity-masking and ungoverned data access; explicitly disallowed by ServiceTitan.
+
+**Use this repo only as a Customer-Built App** — you host it, you run it, the App Keys stay with you. ServiceTitan's prerequisites for that path:
+
+1. Be on the **Works** or **Ent Plus** package.
+2. Email **integrations@servicetitan.com** to request an Integration Environment.
+
+> ⚠️ **Don't make this a Tunneled App.** Don't hand your `ST_APP_KEY` / `ST_CLIENT_SECRET` to a vendor or external service to run on your behalf, and don't deploy this CLI under credentials a third party owns. If a vendor asks you to create an app in your tenant and share its keys with them, that's the tunneling pattern ServiceTitan disallows — point them at the Certified Apps path instead.
+>
+> If you want to *distribute* a tool like this to other ServiceTitan customers, build a Certified App and go through ServiceTitan's marketplace review — this repo isn't a substitute for that.
 
 ---
 
