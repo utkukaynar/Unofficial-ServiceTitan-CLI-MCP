@@ -1,4 +1,4 @@
-# Unofficial ServiceTitan CLI
+# Unofficial ServiceTitan CLI & MCP
 
 An unofficial command-line tool and MCP server for the [ServiceTitan REST API v2](https://developer.servicetitan.io/). Two interfaces over the same core:
 
