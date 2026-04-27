@@ -7,6 +7,12 @@ An unofficial command-line tool and MCP server for the [ServiceTitan REST API v2
 
 > Not affiliated with or endorsed by ServiceTitan, Inc.
 
+### Intended integration path: Customer-Built Apps only
+
+ServiceTitan documents several integration paths in [Integration Paths](https://developer.servicetitan.io/integration-paths). **Use this repo only for the "Customer-Built Apps" path** — i.e. a ServiceTitan customer building an internal tool against their own tenant.
+
+Other paths (apps distributed to additional ServiceTitan customers, e.g. Integrator/Marketplace apps) involve onboarding, review, and distribution requirements that this CLI does not satisfy. If you intend to ship something to other ServiceTitan customers, follow ServiceTitan's official path on the link above instead of using this project as a basis for distribution.
+
 ---
 
 ## Table of Contents
