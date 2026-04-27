@@ -50,7 +50,7 @@ The installer picks the best available isolated installer (`uv tool` → `pipx` 
 **macOS / Linux:**
 
 ```bash
-git clone https://github.com/utkukaynar/Unofficial_ST_CLI.git
+git clone https://github.com/utkukaynar/Unofficial-ServiceTitan-CLI-MCP.git
 cd Unofficial_ST_CLI
 ./scripts/install.sh                # interactive
 # or non-interactive:
@@ -63,7 +63,7 @@ cd Unofficial_ST_CLI
 **Windows (PowerShell):**
 
 ```powershell
-git clone https://github.com/utkukaynar/Unofficial_ST_CLI.git
+git clone https://github.com/utkukaynar/Unofficial-ServiceTitan-CLI-MCP.git
 Set-Location Unofficial_ST_CLI
 .\scripts\install.ps1                       # interactive
 # or non-interactive:
