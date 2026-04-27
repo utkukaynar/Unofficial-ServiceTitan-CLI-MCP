@@ -1,0 +1,92 @@
+"""Base HTTP client wrapping httpx with auth, retry, and error mapping."""
+
+from __future__ import annotations
+
+import time
+from typing import Any
+
+import httpx
+
+from st_cli.auth import TokenManager
+from st_cli.config import Settings
+from st_cli.exceptions import APIError, NotFoundError, RateLimitError
+
+_MAX_RETRIES = 3
+_BACKOFF_BASE = 1.0  # seconds
+
+
+class ServiceTitanClient:
+    """HTTP client for ServiceTitan API v2."""
+
+    def __init__(self, settings: Settings) -> None:
+        self._settings = settings
+        self._token_manager = TokenManager(settings)
+        self._http = httpx.Client(base_url=settings.api_base, timeout=30.0)
+
+    def close(self) -> None:
+        self._http.close()
+
+    def _headers(self) -> dict[str, str]:
+        return {
+            "Authorization": f"Bearer {self._token_manager.get_token()}",
+            "ST-App-Key": self._settings.app_key,
+        }
+
+    def _url(self, module: str, resource: str) -> str:
+        return f"/{module}/v2/tenant/{self._settings.tenant_id}/{resource}"
+
+    def get(self, module: str, resource: str, params: dict[str, Any] | None = None) -> Any:
+        return self._request("GET", module, resource, params=params)
+
+    def post(
+        self,
+        module: str,
+        resource: str,
+        json_body: dict[str, Any] | None = None,
+        params: dict[str, Any] | None = None,
+    ) -> Any:
+        return self._request("POST", module, resource, params=params, json_body=json_body)
+
+    def patch(self, module: str, resource: str, json_body: dict[str, Any] | None = None) -> Any:
+        return self._request("PATCH", module, resource, json_body=json_body)
+
+    def _request(
+        self,
+        method: str,
+        module: str,
+        resource: str,
+        params: dict[str, Any] | None = None,
+        json_body: dict[str, Any] | None = None,
+    ) -> Any:
+        url = self._url(module, resource)
+        retries = 0
+        refreshed = False
+
+        while True:
+            resp = self._http.request(
+                method, url, headers=self._headers(), params=params, json=json_body
+            )
+
+            if resp.status_code == 401 and not refreshed:
+                self._token_manager.force_refresh()
+                refreshed = True
+                continue
+
+            if resp.status_code == 429 and retries < _MAX_RETRIES:
+                retries += 1
+                wait = _BACKOFF_BASE * (2 ** (retries - 1))
+                time.sleep(wait)
+                continue
+
+            break
+
+        if resp.status_code == 404:
+            raise NotFoundError(resp.text)
+        if resp.status_code == 429:
+            raise RateLimitError(resp.text)
+        if resp.status_code >= 400:
+            raise APIError(resp.status_code, resp.text)
+
+        if resp.status_code == 204:
+            return None
+        return resp.json()
