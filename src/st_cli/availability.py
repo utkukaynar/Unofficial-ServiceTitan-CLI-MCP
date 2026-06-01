@@ -61,15 +61,17 @@ def _build_busy_summary(
         tech_name = tech_shifts[0].get("technicianName") or str(tech_id)
         pct_booked = (booked_hours / shift_hours * 100) if shift_hours > 0 else 0.0
 
-        rows.append({
-            "technicianId": tech_id,
-            "technicianName": tech_name,
-            "shifts": len(tech_shifts),
-            "shiftHours": round(shift_hours, 1),
-            "appointments": len(tech_appts),
-            "bookedHours": round(booked_hours, 1),
-            "availableHours": round(available_hours, 1),
-            "percentBooked": round(pct_booked, 1),
-        })
+        rows.append(
+            {
+                "technicianId": tech_id,
+                "technicianName": tech_name,
+                "shifts": len(tech_shifts),
+                "shiftHours": round(shift_hours, 1),
+                "appointments": len(tech_appts),
+                "bookedHours": round(booked_hours, 1),
+                "availableHours": round(available_hours, 1),
+                "percentBooked": round(pct_booked, 1),
+            }
+        )
 
     return rows

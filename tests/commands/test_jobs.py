@@ -2,13 +2,26 @@
 
 from __future__ import annotations
 
-import pytest
-
 from tests.conftest import make_envelope
 
-
-JOB = {"id": 1, "number": "J-001", "customerId": 10, "jobStatus": "Completed", "jobTypeName": "Repair", "total": 150.0, "createdOn": "2025-01-01"}
-APPOINTMENT = {"id": 1, "jobId": 1, "status": "Scheduled", "start": "2025-01-01T09:00", "end": "2025-01-01T10:00", "arrivalWindowStart": "09:00", "arrivalWindowEnd": "10:00"}
+JOB = {
+    "id": 1,
+    "number": "J-001",
+    "customerId": 10,
+    "jobStatus": "Completed",
+    "jobTypeName": "Repair",
+    "total": 150.0,
+    "createdOn": "2025-01-01",
+}
+APPOINTMENT = {
+    "id": 1,
+    "jobId": 1,
+    "status": "Scheduled",
+    "start": "2025-01-01T09:00",
+    "end": "2025-01-01T10:00",
+    "arrivalWindowStart": "09:00",
+    "arrivalWindowEnd": "10:00",
+}
 PROJECT = {"id": 1, "number": "P-001", "name": "Big Project", "status": "Active", "customerId": 10}
 
 

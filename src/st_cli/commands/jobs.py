@@ -48,8 +48,12 @@ PROJECT_COLUMNS: list[Column] = [
 def jobs_list(
     ctx: typer.Context,
     status: Optional[str] = typer.Option(None, help="Filter by job status"),
-    range_val: Optional[str] = typer.Option(None, "--range", help="Date range (e.g. last-week, this-month)"),
-    from_date: Optional[str] = typer.Option(None, "--from-date", help="Created on or after (YYYY-MM-DD)"),
+    range_val: Optional[str] = typer.Option(
+        None, "--range", help="Date range (e.g. last-week, this-month)"
+    ),
+    from_date: Optional[str] = typer.Option(
+        None, "--from-date", help="Created on or after (YYYY-MM-DD)"
+    ),
     to_date: Optional[str] = typer.Option(None, "--to-date", help="Created before (YYYY-MM-DD)"),
     customer_id: Optional[int] = typer.Option(None, help="Filter by customer ID"),
     page: int = typer.Option(1, help="Page number"),
@@ -144,7 +148,9 @@ def appointments_list(
 
 
 @app.command("appointments-get")
-def appointments_get(ctx: typer.Context, appointment_id: int = typer.Argument(..., help="Appointment ID")) -> None:
+def appointments_get(
+    ctx: typer.Context, appointment_id: int = typer.Argument(..., help="Appointment ID")
+) -> None:
     """Get a single appointment by ID."""
     client = ctx.obj["client"]
     data = client.get(MODULE, f"appointments/{appointment_id}")
@@ -170,7 +176,9 @@ def projects_list(
 
 
 @app.command("projects-get")
-def projects_get(ctx: typer.Context, project_id: int = typer.Argument(..., help="Project ID")) -> None:
+def projects_get(
+    ctx: typer.Context, project_id: int = typer.Argument(..., help="Project ID")
+) -> None:
     """Get a single project by ID."""
     client = ctx.obj["client"]
     data = client.get(MODULE, f"projects/{project_id}")

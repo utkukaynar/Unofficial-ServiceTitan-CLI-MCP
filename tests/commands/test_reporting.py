@@ -78,10 +78,18 @@ class TestReportFields:
 class TestReportData:
     def test_basic_fetch(self, invoke, mock_client):
         mock_client.post.return_value = REPORT_DATA_RESP
-        result = invoke([
-            "reporting", "data", "performance-reports", "12345",
-            "--from", "2026-03-01", "--to", "2026-03-27",
-        ])
+        result = invoke(
+            [
+                "reporting",
+                "data",
+                "performance-reports",
+                "12345",
+                "--from",
+                "2026-03-01",
+                "--to",
+                "2026-03-27",
+            ]
+        )
         assert result.exit_code == 0
         assert "John Smith" in result.output
         assert "Jane Doe" in result.output
@@ -90,8 +98,14 @@ class TestReportData:
         mock_client.post.return_value = REPORT_DATA_RESP
         result = invoke(
             [
-                "reporting", "data", "performance-reports", "12345",
-                "--from", "2026-03-01", "--to", "2026-03-27",
+                "reporting",
+                "data",
+                "performance-reports",
+                "12345",
+                "--from",
+                "2026-03-01",
+                "--to",
+                "2026-03-27",
             ],
             json_output=True,
         )
@@ -104,10 +118,18 @@ class TestReportData:
 
     def test_passes_date_params(self, invoke, mock_client):
         mock_client.post.return_value = REPORT_DATA_RESP
-        invoke([
-            "reporting", "data", "performance-reports", "12345",
-            "--from", "2026-03-01", "--to", "2026-03-27",
-        ])
+        invoke(
+            [
+                "reporting",
+                "data",
+                "performance-reports",
+                "12345",
+                "--from",
+                "2026-03-01",
+                "--to",
+                "2026-03-27",
+            ]
+        )
         call_kwargs = mock_client.post.call_args[1]
         body = call_kwargs["json_body"]
         assert {"name": "From", "value": "2026-03-01"} in body["parameters"]
@@ -115,11 +137,22 @@ class TestReportData:
 
     def test_passes_page_params(self, invoke, mock_client):
         mock_client.post.return_value = REPORT_DATA_RESP
-        invoke([
-            "reporting", "data", "performance-reports", "12345",
-            "--from", "2026-03-01", "--to", "2026-03-27",
-            "--page", "2", "--page-size", "25",
-        ])
+        invoke(
+            [
+                "reporting",
+                "data",
+                "performance-reports",
+                "12345",
+                "--from",
+                "2026-03-01",
+                "--to",
+                "2026-03-27",
+                "--page",
+                "2",
+                "--page-size",
+                "25",
+            ]
+        )
         call_kwargs = mock_client.post.call_args[1]
         assert call_kwargs["params"]["page"] == 2
         assert call_kwargs["params"]["pageSize"] == 25
@@ -138,21 +171,39 @@ class TestReportData:
             "totalCount": 2,
         }
         mock_client.post.side_effect = [page1, page2]
-        result = invoke([
-            "reporting", "data", "performance-reports", "12345",
-            "--from", "2026-03-01", "--to", "2026-03-27", "--all",
-        ])
+        result = invoke(
+            [
+                "reporting",
+                "data",
+                "performance-reports",
+                "12345",
+                "--from",
+                "2026-03-01",
+                "--to",
+                "2026-03-27",
+                "--all",
+            ]
+        )
         assert result.exit_code == 0
         assert "John Smith" in result.output
         assert "Jane Doe" in result.output
 
     def test_extra_params(self, invoke, mock_client):
         mock_client.post.return_value = REPORT_DATA_RESP
-        invoke([
-            "reporting", "data", "performance-reports", "12345",
-            "--from", "2026-03-01", "--to", "2026-03-27",
-            "--params", '[{"name": "BusinessUnitId", "value": "42"}]',
-        ])
+        invoke(
+            [
+                "reporting",
+                "data",
+                "performance-reports",
+                "12345",
+                "--from",
+                "2026-03-01",
+                "--to",
+                "2026-03-27",
+                "--params",
+                '[{"name": "BusinessUnitId", "value": "42"}]',
+            ]
+        )
         call_kwargs = mock_client.post.call_args[1]
         body = call_kwargs["json_body"]
         assert {"name": "BusinessUnitId", "value": "42"} in body["parameters"]

@@ -87,7 +87,9 @@ def customers_list(
 
 
 @app.command()
-def customers_get(ctx: typer.Context, customer_id: int = typer.Argument(..., help="Customer ID")) -> None:
+def customers_get(
+    ctx: typer.Context, customer_id: int = typer.Argument(..., help="Customer ID")
+) -> None:
     """Get a single customer by ID."""
     client = ctx.obj["client"]
     data = client.get(MODULE, f"customers/{customer_id}")
@@ -155,7 +157,9 @@ def locations_list(
 
 
 @app.command()
-def locations_get(ctx: typer.Context, location_id: int = typer.Argument(..., help="Location ID")) -> None:
+def locations_get(
+    ctx: typer.Context, location_id: int = typer.Argument(..., help="Location ID")
+) -> None:
     """Get a single location by ID."""
     client = ctx.obj["client"]
     data = client.get(MODULE, f"locations/{location_id}")
@@ -190,7 +194,9 @@ def bookings_list(
 
 
 @app.command()
-def bookings_get(ctx: typer.Context, booking_id: int = typer.Argument(..., help="Booking ID")) -> None:
+def bookings_get(
+    ctx: typer.Context, booking_id: int = typer.Argument(..., help="Booking ID")
+) -> None:
     """Get a single booking by ID."""
     client = ctx.obj["client"]
     data = client.get(MODULE, f"bookings/{booking_id}")
@@ -250,7 +256,9 @@ def contacts_list(
 
 
 @app.command()
-def contacts_get(ctx: typer.Context, contact_id: int = typer.Argument(..., help="Contact ID")) -> None:
+def contacts_get(
+    ctx: typer.Context, contact_id: int = typer.Argument(..., help="Contact ID")
+) -> None:
     """Get a single contact by ID."""
     client = ctx.obj["client"]
     data = client.get(MODULE, f"contacts/{contact_id}")

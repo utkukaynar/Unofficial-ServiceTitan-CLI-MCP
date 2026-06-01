@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import httpx
 import pytest
@@ -58,6 +58,27 @@ class TestServiceTitanClient:
         assert result == {"id": 1}
 
     @respx.mock
+    def test_put_success(self, client):
+        url = "/pricebook/v2/tenant/12345/services/1"
+        respx.put(url).mock(return_value=httpx.Response(200, json={"id": 1}))
+        result = client.put("pricebook", "services/1", json_body={"name": "New"})
+        assert result == {"id": 1}
+
+    @respx.mock
+    def test_delete_success(self, client):
+        url = "/pricebook/v2/tenant/12345/services/1"
+        respx.delete(url).mock(return_value=httpx.Response(204))
+        result = client.delete("pricebook", "services/1")
+        assert result is None
+
+    @respx.mock
+    def test_delete_passes_params(self, client):
+        url = "/crm/v2/tenant/12345/customers/1/tags"
+        route = respx.delete(url).mock(return_value=httpx.Response(200, json={"ok": True}))
+        client.delete("crm", "customers/1/tags", params={"tagId": 7})
+        assert "tagId=7" in str(route.calls[0].request.url)
+
+    @respx.mock
     def test_404_raises_not_found(self, client):
         url = "/crm/v2/tenant/12345/customers/999"
         respx.get(url).mock(return_value=httpx.Response(404, text="not found"))
@@ -75,20 +96,24 @@ class TestServiceTitanClient:
     @respx.mock
     def test_401_triggers_token_refresh(self, client):
         url = "/crm/v2/tenant/12345/customers"
-        respx.get(url).mock(side_effect=[
-            httpx.Response(401, text="expired"),
-            httpx.Response(200, json={"data": []}),
-        ])
+        respx.get(url).mock(
+            side_effect=[
+                httpx.Response(401, text="expired"),
+                httpx.Response(200, json={"data": []}),
+            ]
+        )
         result = client.get("crm", "customers")
         assert result == {"data": []}
 
     @respx.mock
     def test_429_retries_with_backoff(self, client):
         url = "/crm/v2/tenant/12345/customers"
-        respx.get(url).mock(side_effect=[
-            httpx.Response(429, text="rate limited"),
-            httpx.Response(200, json={"data": []}),
-        ])
+        respx.get(url).mock(
+            side_effect=[
+                httpx.Response(429, text="rate limited"),
+                httpx.Response(200, json={"data": []}),
+            ]
+        )
         with patch("st_cli.client.time.sleep"):  # skip actual sleep
             result = client.get("crm", "customers")
         assert result == {"data": []}

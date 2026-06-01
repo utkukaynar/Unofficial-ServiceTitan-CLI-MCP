@@ -2,15 +2,22 @@
 
 from __future__ import annotations
 
-import pytest
-
 from tests.conftest import make_envelope
 
 
 class TestCustomersList:
     def test_basic_list(self, invoke, mock_client):
         mock_client.get.return_value = make_envelope(
-            [{"id": 1, "name": "Acme", "email": "a@b.com", "phone": "555", "active": True, "createdOn": "2025-01-01"}]
+            [
+                {
+                    "id": 1,
+                    "name": "Acme",
+                    "email": "a@b.com",
+                    "phone": "555",
+                    "active": True,
+                    "createdOn": "2025-01-01",
+                }
+            ]
         )
         result = invoke(["crm", "customers-list"])
         assert result.exit_code == 0
@@ -26,7 +33,16 @@ class TestCustomersList:
 
     def test_json_output(self, invoke, mock_client):
         mock_client.get.return_value = make_envelope(
-            [{"id": 1, "name": "Acme", "email": None, "phone": None, "active": True, "createdOn": "2025-01-01"}]
+            [
+                {
+                    "id": 1,
+                    "name": "Acme",
+                    "email": None,
+                    "phone": None,
+                    "active": True,
+                    "createdOn": "2025-01-01",
+                }
+            ]
         )
         result = invoke(["crm", "customers-list"], json_output=True)
         assert result.exit_code == 0
@@ -35,7 +51,12 @@ class TestCustomersList:
 class TestCustomersGet:
     def test_get_by_id(self, invoke, mock_client):
         mock_client.get.return_value = {
-            "id": 42, "name": "Acme", "email": "a@b.com", "phone": "555", "active": True, "createdOn": "2025-01-01"
+            "id": 42,
+            "name": "Acme",
+            "email": "a@b.com",
+            "phone": "555",
+            "active": True,
+            "createdOn": "2025-01-01",
         }
         result = invoke(["crm", "customers-get", "42"])
         assert result.exit_code == 0
@@ -46,7 +67,18 @@ class TestCustomersGet:
 class TestLocations:
     def test_locations_list(self, invoke, mock_client):
         mock_client.get.return_value = make_envelope(
-            [{"id": 1, "name": "HQ", "address": {"street": "123 Main", "city": "Austin", "state": "TX", "zip": "78701"}}]
+            [
+                {
+                    "id": 1,
+                    "name": "HQ",
+                    "address": {
+                        "street": "123 Main",
+                        "city": "Austin",
+                        "state": "TX",
+                        "zip": "78701",
+                    },
+                }
+            ]
         )
         result = invoke(["crm", "locations-list"])
         assert result.exit_code == 0
@@ -54,7 +86,9 @@ class TestLocations:
 
     def test_locations_get(self, invoke, mock_client):
         mock_client.get.return_value = {
-            "id": 1, "name": "HQ", "address": {"street": "123 Main", "city": "Austin", "state": "TX", "zip": "78701"}
+            "id": 1,
+            "name": "HQ",
+            "address": {"street": "123 Main", "city": "Austin", "state": "TX", "zip": "78701"},
         }
         result = invoke(["crm", "locations-get", "1"])
         assert result.exit_code == 0
@@ -63,13 +97,27 @@ class TestLocations:
 class TestBookings:
     def test_bookings_list(self, invoke, mock_client):
         mock_client.get.return_value = make_envelope(
-            [{"id": 1, "customerId": 10, "status": "Pending", "start": "2025-01-01", "createdOn": "2025-01-01"}]
+            [
+                {
+                    "id": 1,
+                    "customerId": 10,
+                    "status": "Pending",
+                    "start": "2025-01-01",
+                    "createdOn": "2025-01-01",
+                }
+            ]
         )
         result = invoke(["crm", "bookings-list"])
         assert result.exit_code == 0
 
     def test_bookings_get(self, invoke, mock_client):
-        mock_client.get.return_value = {"id": 1, "customerId": 10, "status": "Pending", "start": "2025-01-01", "createdOn": "2025-01-01"}
+        mock_client.get.return_value = {
+            "id": 1,
+            "customerId": 10,
+            "status": "Pending",
+            "start": "2025-01-01",
+            "createdOn": "2025-01-01",
+        }
         result = invoke(["crm", "bookings-get", "1"])
         assert result.exit_code == 0
 
@@ -93,6 +141,11 @@ class TestContacts:
         assert result.exit_code == 0
 
     def test_contacts_get(self, invoke, mock_client):
-        mock_client.get.return_value = {"id": 1, "type": "Email", "value": "a@b.com", "customerId": 10}
+        mock_client.get.return_value = {
+            "id": 1,
+            "type": "Email",
+            "value": "a@b.com",
+            "customerId": 10,
+        }
         result = invoke(["crm", "contacts-get", "1"])
         assert result.exit_code == 0

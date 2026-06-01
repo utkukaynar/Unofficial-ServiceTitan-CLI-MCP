@@ -8,7 +8,7 @@ import pytest
 from typer.testing import CliRunner
 
 from st_cli.client import ServiceTitanClient
-from st_cli.config import Settings, Environment
+from st_cli.config import Environment, Settings
 
 
 @pytest.fixture()

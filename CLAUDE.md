@@ -49,7 +49,30 @@ Both `main.py` (Typer CLI) and `mcp_server.py` (FastMCP) are thin wrappers over 
 - `availability.py` — `_build_busy_summary` (pure function: shifts + appointments → availability rows)
 - `output.py` — Rich table rendering (CLI only)
 
-When adding a new endpoint, you implement it in both `commands/<module>.py` (CLI) and `mcp_server.py` (MCP tools), both calling the same client/pagination/dates helpers.
+When adding a new endpoint, you usually do **not** hand-write it. The full 24-module
+surface (~390 commands/tools) is generated from one declarative spec:
+
+- `registry.py` — declares every module → resource → ops (`L`/`R`/`C`/`U`/`D`/`P`) +
+  domain `Action`s + `export_feeds`. The 7 hand-written groups appear in `EXTENSIONS`
+  (gap ops only, to avoid name collisions); the other 17 modules in `MODULES`.
+- `engine.py` — closure factories that turn a `Resource` into Typer commands
+  (`add_resource_commands` / `build_cli_app`) and FastMCP tools (`register_mcp_tools`
+  via `McpDeps`). Each generated callable is a distinct closure with a *fixed*
+  signature, so both Typer and FastMCP introspect it normally (no dynamic-signature
+  hacking). A resource named after its module gets bare command names
+  (`st findings list`, not `findings-list`).
+
+**To add a resource:** add a `Resource(...)` to the right `Module` in `registry.py`.
+Both interfaces pick it up automatically. Only hand-write a command/tool (in
+`commands/<module>.py` + `mcp_server.py`) when it needs bespoke logic the generic
+archetypes can't express (e.g. `dispatch capacity`, `dispatch who-busy`, reporting,
+typed list filters). Generated list commands take a generic repeatable
+`--filter key=value` (MCP: a `filters` dict) instead of typed per-field options.
+
+> Note: estimates live in `salestech` (not `accounting`) and job types in `jpm`
+> (not `settings`) — two prior routing bugs, now fixed. The hand-written
+> `accounting estimates-*` / `settings job-types-*` commands were removed; the
+> registry provides them under the correct modules.
 
 ### ServiceTitan API URL structure
 
