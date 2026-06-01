@@ -3,11 +3,6 @@
 from __future__ import annotations
 
 import json
-from io import StringIO
-from unittest.mock import patch
-
-import pytest
-from rich.console import Console
 
 from st_cli.output import _resolve, render, render_single
 

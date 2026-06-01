@@ -54,7 +54,9 @@ def memberships_list(
 
 
 @app.command("get")
-def memberships_get(ctx: typer.Context, membership_id: int = typer.Argument(..., help="Membership ID")) -> None:
+def memberships_get(
+    ctx: typer.Context, membership_id: int = typer.Argument(..., help="Membership ID")
+) -> None:
     """Get a single membership by ID."""
     client = ctx.obj["client"]
     data = client.get(MODULE, f"memberships/{membership_id}")

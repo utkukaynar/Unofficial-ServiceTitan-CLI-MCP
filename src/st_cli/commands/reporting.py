@@ -109,8 +109,11 @@ def reports_list(
     """List reports in a category."""
     client = ctx.obj["client"]
     envelope = fetch_page(
-        client, MODULE, f"report-category/{category_id}/reports",
-        page=page, page_size=page_size,
+        client,
+        MODULE,
+        f"report-category/{category_id}/reports",
+        page=page,
+        page_size=page_size,
     )
     render(
         envelope.get("data", []),
@@ -211,7 +214,8 @@ def report_data(
         current_page = 1
         while True:
             resp = client.post(
-                MODULE, resource,
+                MODULE,
+                resource,
                 json_body=body,
                 params={"page": current_page, "pageSize": page_size},
             )
@@ -222,12 +226,16 @@ def report_data(
                 break
             current_page += 1
         _render_report(
-            all_fields, all_data,
-            as_json=as_json, title="Report Data", total_count=len(all_data),
+            all_fields,
+            all_data,
+            as_json=as_json,
+            title="Report Data",
+            total_count=len(all_data),
         )
     else:
         resp = client.post(
-            MODULE, resource,
+            MODULE,
+            resource,
             json_body=body,
             params={"page": page, "pageSize": page_size},
         )

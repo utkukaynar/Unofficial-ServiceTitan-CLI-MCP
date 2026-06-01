@@ -29,9 +29,7 @@ from tests.conftest import make_envelope
 
 class TestPaginate:
     def test_single_page_mode(self, mock_client):
-        mock_client.get.return_value = make_envelope(
-            [{"id": 1}, {"id": 2}], page=2, total=10
-        )
+        mock_client.get.return_value = make_envelope([{"id": 1}, {"id": 2}], page=2, total=10)
         result = _paginate(mock_client, "crm", "customers", page=2, page_size=50)
         assert result["data"] == [{"id": 1}, {"id": 2}]
         assert result["totalCount"] == 10
@@ -120,8 +118,12 @@ class TestApplyDateParams:
     def test_custom_keys_for_dispatch(self):
         params: dict = {}
         apply_date_params(
-            params, "this-week", "2025-03-01", "2025-03-07",
-            start_key="startsOnOrAfter", end_key="startsBefore",
+            params,
+            "this-week",
+            "2025-03-01",
+            "2025-03-07",
+            start_key="startsOnOrAfter",
+            end_key="startsBefore",
         )
         assert params["startsOnOrAfter"] == "2025-03-01"
         assert params["startsBefore"] == "2025-03-07"
@@ -129,8 +131,12 @@ class TestApplyDateParams:
     def test_dispatch_range_parsed(self):
         params: dict = {}
         apply_date_params(
-            params, "today", None, None,
-            start_key="startsOnOrAfter", end_key="startsBefore",
+            params,
+            "today",
+            None,
+            None,
+            start_key="startsOnOrAfter",
+            end_key="startsBefore",
         )
         assert "startsOnOrAfter" in params
         assert "startsBefore" in params
@@ -246,9 +252,7 @@ class TestJPMTools:
         from st_cli.mcp_server import st_jpm_jobs_list
 
         mock_client.get.return_value = make_envelope([{"id": 1}])
-        result = st_jpm_jobs_list(
-            mock_ctx, status="Completed", customer_id=42, date_range="today"
-        )
+        result = st_jpm_jobs_list(mock_ctx, status="Completed", customer_id=42, date_range="today")
         assert len(result["data"]) == 1
         call_params = mock_client.get.call_args[1]["params"]
         assert call_params["jobStatus"] == "Completed"
@@ -282,7 +286,7 @@ class TestJPMTools:
         from st_cli.mcp_server import st_jpm_appointments_list
 
         mock_client.get.return_value = make_envelope([{"id": 1, "jobId": 5}])
-        result = st_jpm_appointments_list(mock_ctx, job_id=5)
+        st_jpm_appointments_list(mock_ctx, job_id=5)
         call_params = mock_client.get.call_args[1]["params"]
         assert call_params["jobId"] == 5
 
@@ -308,16 +312,21 @@ class TestDispatchTools:
         from st_cli.mcp_server import st_dispatch_who_busy
 
         shift = {
-            "id": 1, "technicianId": 100, "technicianName": "John",
-            "start": "2025-01-15T08:00:00", "end": "2025-01-15T17:00:00",
+            "id": 1,
+            "technicianId": 100,
+            "technicianName": "John",
+            "start": "2025-01-15T08:00:00",
+            "end": "2025-01-15T17:00:00",
         }
         appt = {
-            "id": 10, "technicianId": 100,
-            "start": "2025-01-15T09:00:00", "end": "2025-01-15T11:00:00",
+            "id": 10,
+            "technicianId": 100,
+            "start": "2025-01-15T09:00:00",
+            "end": "2025-01-15T11:00:00",
         }
         mock_client.get.side_effect = [
-            make_envelope([shift]),   # shifts
-            make_envelope([appt]),    # appointments
+            make_envelope([shift]),  # shifts
+            make_envelope([appt]),  # appointments
         ]
         result = st_dispatch_who_busy(mock_ctx, date_range="today")
         assert len(result["data"]) == 1
@@ -339,7 +348,7 @@ class TestAccountingTools:
         from st_cli.mcp_server import st_accounting_invoices_list
 
         mock_client.get.return_value = make_envelope([{"id": 1, "total": 500}])
-        result = st_accounting_invoices_list(mock_ctx, status="Pending")
+        st_accounting_invoices_list(mock_ctx, status="Pending")
         call_params = mock_client.get.call_args[1]["params"]
         assert call_params["status"] == "Pending"
 
@@ -349,22 +358,6 @@ class TestAccountingTools:
         mock_client.get.return_value = {"id": 1, "total": 500}
         result = st_accounting_invoices_get(mock_ctx, invoice_id=1)
         assert result["total"] == 500
-
-    def test_estimates_list(self, mock_ctx, mock_client):
-        from st_cli.mcp_server import st_accounting_estimates_list
-
-        mock_client.get.return_value = make_envelope([{"id": 1}])
-        result = st_accounting_estimates_list(mock_ctx)
-        assert len(result["data"]) == 1
-
-    def test_estimates_list_with_filters(self, mock_ctx, mock_client):
-        from st_cli.mcp_server import st_accounting_estimates_list
-
-        mock_client.get.return_value = make_envelope([{"id": 1}])
-        st_accounting_estimates_list(mock_ctx, status="Open", date_range="today")
-        call_params = mock_client.get.call_args[1]["params"]
-        assert call_params["status"] == "Open"
-        assert "createdOnOrAfter" in call_params
 
     def test_payments_list(self, mock_ctx, mock_client):
         from st_cli.mcp_server import st_accounting_payments_list

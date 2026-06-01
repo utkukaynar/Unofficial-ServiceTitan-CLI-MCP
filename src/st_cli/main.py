@@ -7,10 +7,12 @@ from typing import Optional
 
 import typer
 
+from st_cli import engine
 from st_cli.client import ServiceTitanClient
 from st_cli.commands import accounting, crm, dispatch, jobs, memberships, reporting, settings
 from st_cli.config import load_settings
 from st_cli.exceptions import STCLIError
+from st_cli.registry import EXTENSIONS, MODULES
 
 app = typer.Typer(
     name="st",
@@ -18,13 +20,27 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 
-app.add_typer(crm.app, name="crm")
-app.add_typer(jobs.app, name="jobs")
-app.add_typer(dispatch.app, name="dispatch")
-app.add_typer(accounting.app, name="accounting")
-app.add_typer(memberships.app, name="memberships")
-app.add_typer(reporting.app, name="reporting")
-app.add_typer(settings.app, name="settings")
+# The 7 hand-written groups carry the bespoke, ergonomic commands (typed
+# filters, who-busy, capacity, reporting). The registry generates the rest.
+_HANDWRITTEN = {
+    "crm": crm.app,
+    "jobs": jobs.app,
+    "dispatch": dispatch.app,
+    "accounting": accounting.app,
+    "memberships": memberships.app,
+    "reporting": reporting.app,
+    "settings": settings.app,
+}
+for _group, _existing_app in _HANDWRITTEN.items():
+    app.add_typer(_existing_app, name=_group)
+
+# Append registry-generated gap commands onto the hand-written groups …
+for _ext in EXTENSIONS:
+    engine.add_resource_commands(_HANDWRITTEN[_ext.cli_group], _ext)
+
+# … and register every brand-new module group from the registry.
+for _mod in MODULES:
+    app.add_typer(engine.build_cli_app(_mod), name=_mod.cli_group)
 
 
 class _LazyClient:

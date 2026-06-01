@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
-import pytest
-
 from tests.conftest import make_envelope
 
-
-MEMBERSHIP = {"id": 1, "customerId": 10, "membershipTypeId": 5, "status": "Active", "from": "2025-01-01", "to": "2026-01-01", "createdOn": "2025-01-01"}
+MEMBERSHIP = {
+    "id": 1,
+    "customerId": 10,
+    "membershipTypeId": 5,
+    "status": "Active",
+    "from": "2025-01-01",
+    "to": "2026-01-01",
+    "createdOn": "2025-01-01",
+}
 MEMBERSHIP_TYPE = {"id": 5, "name": "Gold Plan", "durationBillingPeriods": 12, "active": True}
 
 

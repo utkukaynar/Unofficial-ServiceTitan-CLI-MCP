@@ -19,6 +19,7 @@ from st_cli.client import ServiceTitanClient
 from st_cli.commands.reporting import _report_rows_to_dicts
 from st_cli.config import load_settings
 from st_cli.dates import apply_date_params, validate_max_range
+from st_cli.engine import McpDeps, register_mcp_tools
 from st_cli.exceptions import (
     APIError,
     AuthError,
@@ -29,6 +30,7 @@ from st_cli.exceptions import (
     STCLIError,
 )
 from st_cli.pagination import fetch_all, fetch_page
+from st_cli.registry import all_modules
 
 # ---------------------------------------------------------------------------
 # Lifespan — create/destroy ServiceTitanClient once per server run
@@ -55,19 +57,22 @@ async def _lifespan(server: FastMCP) -> AsyncIterator[dict[str, Any]]:
 mcp = FastMCP(
     name="ServiceTitan",
     instructions=(
-        "ServiceTitan API tools for home-services contractors. "
-        "Modules: CRM (customers, locations, bookings, contacts), "
-        "Jobs (jobs, appointments, projects), Dispatch (shifts, assignments, "
-        "who-busy, events, capacity, zones, teams), "
-        "Accounting (invoices, estimates, payments), "
-        "Memberships (memberships, membership-types), "
-        "Reporting (report categories, reports, report data — e.g. Technician Scorecard), "
-        "Settings (business units, job types). "
-        "All list tools support pagination via `page` (single page) or "
-        "auto-pagination up to `max_results`. "
-        "Date filters accept ISO dates or range strings like 'today', "
-        "'last-week', 'this-month', 'last-30-days'. "
-        "The capacity endpoint has a 14-day maximum date range."
+        "ServiceTitan API v2 tools for home-services contractors — full coverage "
+        "across all 24 modules: CRM, Jobs/JPM, Dispatch, Pricebook, Inventory, "
+        "Sales & Estimates (salestech), Accounting, Memberships, Payroll, Settings, "
+        "Marketing (+Ads), Timesheets, Equipment Systems, Findings, Task Management, "
+        "Telecom, Customer Interactions, Forms, Reporting, Job Booking, Marketing "
+        "Reputation, Scheduling Pro, and Service Agreements. "
+        "Tool names follow st_{module}_{resource}_{action} (e.g. st_salestech_estimates_sell, "
+        "st_inventory_purchase_orders_approve). Estimates live under salestech; job types "
+        "under jpm. "
+        "List tools take an optional `filters` dict of query params and support pagination "
+        "via `page` (single page) or auto-pagination up to `max_results`. "
+        "Export tools (st_{module}_export_{feed}) stream change-feeds; pass `continue_from` "
+        "to resume from a prior token. "
+        "Date filters accept ISO dates or range strings like 'today', 'last-week', "
+        "'this-month', 'last-30-days'. The capacity endpoint has a 14-day maximum range. "
+        "Reporting is rate-limited to 1 of the same report per minute per tenant."
     ),
     lifespan=_lifespan,
 )
@@ -596,35 +601,6 @@ def st_accounting_invoices_get(ctx: Context, invoice_id: int) -> dict[str, Any]:
 
 @mcp.tool(tags={"accounting", "read"})
 @_handle_errors
-def st_accounting_estimates_list(
-    ctx: Context,
-    status: str | None = None,
-    date_range: str | None = None,
-    created_after: str | None = None,
-    created_before: str | None = None,
-    page: int | None = None,
-    page_size: int = 50,
-    max_results: int = _DEFAULT_MAX_RESULTS,
-) -> dict[str, Any]:
-    """List estimates. Filter by status or date range."""
-    params: dict[str, Any] = {}
-    if status:
-        params["status"] = status
-    apply_date_params(params, date_range, created_after, created_before)
-    return _paginate(
-        _get_client(ctx), "accounting", "estimates", params, page, page_size, max_results
-    )
-
-
-@mcp.tool(tags={"accounting", "read"})
-@_handle_errors
-def st_accounting_estimates_get(ctx: Context, estimate_id: int) -> dict[str, Any]:
-    """Get a single estimate by ID."""
-    return _get_client(ctx).get("accounting", f"estimates/{estimate_id}")
-
-
-@mcp.tool(tags={"accounting", "read"})
-@_handle_errors
 def st_accounting_payments_list(
     ctx: Context,
     date_range: str | None = None,
@@ -756,7 +732,7 @@ def st_reporting_report_data(
     Use st_reporting_report_fields first to discover required parameters.
 
     Returns rows as dicts keyed by field name, plus fields metadata.
-    Rate limit: 5 calls/min per report per tenant.
+    Rate limit: 1 of the same report per minute per tenant.
     """
     client = _get_client(ctx)
     max_results = min(max_results, _MAX_RESULTS_CAP)
@@ -847,29 +823,22 @@ def st_settings_business_units_get(ctx: Context, business_unit_id: int) -> dict[
     return _get_client(ctx).get("settings", f"business-units/{business_unit_id}")
 
 
-@mcp.tool(tags={"settings", "read"})
-@_handle_errors
-def st_settings_job_types_list(
-    ctx: Context,
-    active: bool | None = None,
-    page: int | None = None,
-    page_size: int = 50,
-    max_results: int = _DEFAULT_MAX_RESULTS,
-) -> dict[str, Any]:
-    """List job types. Optionally filter by active status."""
-    params: dict[str, Any] = {}
-    if active is not None:
-        params["active"] = active
-    return _paginate(
-        _get_client(ctx), "settings", "job-types", params, page, page_size, max_results
-    )
+# ===========================================================================
+# Generated tools — the rest of the ServiceTitan surface, from the registry.
+# These cover every module/resource not hand-wrapped above (job types now live
+# under jpm, estimates under salestech — fixing the two prior routing bugs).
+# ===========================================================================
 
+_deps = McpDeps(
+    get_client=_get_client,
+    paginate=_paginate,
+    handle_errors=_handle_errors,
+    max_results_cap=_MAX_RESULTS_CAP,
+    default_max_results=_DEFAULT_MAX_RESULTS,
+)
 
-@mcp.tool(tags={"settings", "read"})
-@_handle_errors
-def st_settings_job_types_get(ctx: Context, job_type_id: int) -> dict[str, Any]:
-    """Get a single job type by ID."""
-    return _get_client(ctx).get("settings", f"job-types/{job_type_id}")
+for _module in all_modules():
+    register_mcp_tools(mcp, _module, _deps)
 
 
 # ---------------------------------------------------------------------------

@@ -1,7 +1,5 @@
 """Tests for config.py."""
 
-import os
-
 import pytest
 
 from st_cli.config import Environment, Settings
@@ -45,14 +43,20 @@ class TestSettings:
 
     def test_defaults_to_production(self):
         s = Settings(
-            client_id="a", client_secret="b", app_key="c", tenant_id=1,
+            client_id="a",
+            client_secret="b",
+            app_key="c",
+            tenant_id=1,
             _env_file=None,
         )
         assert s.environment == Environment.PRODUCTION
 
     def test_auth_url_delegates_to_environment(self):
         s = Settings(
-            client_id="a", client_secret="b", app_key="c", tenant_id=1,
+            client_id="a",
+            client_secret="b",
+            app_key="c",
+            tenant_id=1,
             environment=Environment.INTEGRATION,
             _env_file=None,
         )
@@ -60,7 +64,10 @@ class TestSettings:
 
     def test_api_base_delegates_to_environment(self):
         s = Settings(
-            client_id="a", client_secret="b", app_key="c", tenant_id=1,
+            client_id="a",
+            client_secret="b",
+            app_key="c",
+            tenant_id=1,
             environment=Environment.INTEGRATION,
             _env_file=None,
         )

@@ -6,7 +6,12 @@ from unittest.mock import MagicMock, call
 
 import pytest
 
-from st_cli.pagination import fetch_all, fetch_page
+from st_cli.pagination import (
+    fetch_all,
+    fetch_export_all,
+    fetch_export_page,
+    fetch_page,
+)
 
 
 @pytest.fixture()
@@ -38,7 +43,9 @@ class TestFetchPage:
 class TestFetchAll:
     def test_single_page(self, mock_client):
         mock_client.get.return_value = {
-            "data": [{"id": 1}, {"id": 2}], "hasMore": False, "totalCount": 2
+            "data": [{"id": 1}, {"id": 2}],
+            "hasMore": False,
+            "totalCount": 2,
         }
         records = list(fetch_all(mock_client, "crm", "customers"))
         assert records == [{"id": 1}, {"id": 2}]
@@ -64,3 +71,50 @@ class TestFetchAll:
         mock_client.get.assert_called_once_with(
             "crm", "customers", params={"page": 1, "pageSize": 10}
         )
+
+
+class TestFetchExportPage:
+    def test_url_and_token(self, mock_client):
+        mock_client.get.return_value = {"data": [], "hasMore": False, "continueFrom": "tok"}
+        fetch_export_page(mock_client, "jpm", "jobs", continue_from="abc")
+        mock_client.get.assert_called_once_with("jpm", "export/jobs", params={"from": "abc"})
+
+    def test_no_token_omits_from(self, mock_client):
+        mock_client.get.return_value = {"data": [], "hasMore": False}
+        fetch_export_page(mock_client, "jpm", "jobs")
+        assert mock_client.get.call_args[1]["params"] == {}
+
+    def test_include_recent_changes(self, mock_client):
+        mock_client.get.return_value = {"data": [], "hasMore": False}
+        fetch_export_page(mock_client, "jpm", "jobs", include_recent_changes=True)
+        assert mock_client.get.call_args[1]["params"]["includeRecentChanges"] is True
+
+
+class TestFetchExportAll:
+    def test_drains_feed_and_returns_token(self, mock_client):
+        mock_client.get.side_effect = [
+            {"data": [{"id": 1}], "hasMore": True, "continueFrom": "t1"},
+            {"data": [{"id": 2}], "hasMore": False, "continueFrom": "t2"},
+        ]
+        records, token = fetch_export_all(mock_client, "jpm", "jobs")
+        assert records == [{"id": 1}, {"id": 2}]
+        assert token == "t2"
+        # second call resumes from the first page's token
+        assert mock_client.get.call_args_list[1] == call(
+            "jpm", "export/jobs", params={"from": "t1"}
+        )
+
+    def test_stops_at_max_records(self, mock_client):
+        mock_client.get.side_effect = [
+            {"data": [{"id": 1}, {"id": 2}], "hasMore": True, "continueFrom": "t1"},
+            {"data": [{"id": 3}], "hasMore": False, "continueFrom": "t2"},
+        ]
+        records, token = fetch_export_all(mock_client, "jpm", "jobs", max_records=2)
+        assert len(records) == 2
+        assert token == "t1"
+        assert mock_client.get.call_count == 1
+
+    def test_resumes_from_supplied_token(self, mock_client):
+        mock_client.get.return_value = {"data": [], "hasMore": False, "continueFrom": "z"}
+        fetch_export_all(mock_client, "telecom", "calls", continue_from="start")
+        assert mock_client.get.call_args[1]["params"]["from"] == "start"

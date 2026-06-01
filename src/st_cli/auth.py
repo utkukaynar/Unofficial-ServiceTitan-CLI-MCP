@@ -37,10 +37,7 @@ class TokenManager:
         return self._refresh()
 
     def _is_valid(self) -> bool:
-        return (
-            self._token is not None
-            and time.time() < (self._expires_at - _EARLY_EXPIRY_BUFFER)
-        )
+        return self._token is not None and time.time() < (self._expires_at - _EARLY_EXPIRY_BUFFER)
 
     def _refresh(self) -> str:
         try:

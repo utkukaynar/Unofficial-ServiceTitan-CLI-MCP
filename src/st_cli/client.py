@@ -50,6 +50,18 @@ class ServiceTitanClient:
     def patch(self, module: str, resource: str, json_body: dict[str, Any] | None = None) -> Any:
         return self._request("PATCH", module, resource, json_body=json_body)
 
+    def put(self, module: str, resource: str, json_body: dict[str, Any] | None = None) -> Any:
+        return self._request("PUT", module, resource, json_body=json_body)
+
+    def delete(
+        self,
+        module: str,
+        resource: str,
+        params: dict[str, Any] | None = None,
+        json_body: dict[str, Any] | None = None,
+    ) -> Any:
+        return self._request("DELETE", module, resource, params=params, json_body=json_body)
+
     def _request(
         self,
         method: str,

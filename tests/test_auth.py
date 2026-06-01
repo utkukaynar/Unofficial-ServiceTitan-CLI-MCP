@@ -4,14 +4,13 @@ from __future__ import annotations
 
 import json
 import time
-from pathlib import Path
 from unittest.mock import patch
 
 import httpx
 import pytest
 import respx
 
-from st_cli.auth import TokenManager, _CACHE_DIR, _CACHE_FILE, _EARLY_EXPIRY_BUFFER
+from st_cli.auth import TokenManager
 from st_cli.config import Environment, Settings
 from st_cli.exceptions import AuthError
 
@@ -32,8 +31,7 @@ def clean_cache(tmp_path):
     """Redirect cache to tmp_path for isolation."""
     cache_dir = tmp_path / ".st_cli"
     cache_file = cache_dir / "token_cache.json"
-    with patch("st_cli.auth._CACHE_DIR", cache_dir), \
-         patch("st_cli.auth._CACHE_FILE", cache_file):
+    with patch("st_cli.auth._CACHE_DIR", cache_dir), patch("st_cli.auth._CACHE_FILE", cache_file):
         yield cache_dir, cache_file
 
 
@@ -87,9 +85,9 @@ class TestTokenManager:
         cache_dir, cache_file = clean_cache
         key = f"{settings.client_id}:{settings.tenant_id}"
         cache_dir.mkdir(parents=True, exist_ok=True)
-        cache_file.write_text(json.dumps({
-            key: {"token": "cached", "expires_at": time.time() + 3600}
-        }))
+        cache_file.write_text(
+            json.dumps({key: {"token": "cached", "expires_at": time.time() + 3600}})
+        )
         route = respx.post(settings.auth_url)
         tm = TokenManager(settings)
         token = tm.get_token()
@@ -101,9 +99,7 @@ class TestTokenManager:
         cache_dir, cache_file = clean_cache
         key = f"{settings.client_id}:{settings.tenant_id}"
         cache_dir.mkdir(parents=True, exist_ok=True)
-        cache_file.write_text(json.dumps({
-            key: {"token": "old", "expires_at": time.time() - 100}
-        }))
+        cache_file.write_text(json.dumps({key: {"token": "old", "expires_at": time.time() - 100}}))
         respx.post(settings.auth_url).mock(
             return_value=httpx.Response(200, json={"access_token": "fresh", "expires_in": 3600})
         )
@@ -113,9 +109,7 @@ class TestTokenManager:
 
     @respx.mock
     def test_auth_error_on_http_failure(self, settings, clean_cache):
-        respx.post(settings.auth_url).mock(
-            return_value=httpx.Response(401, text="bad creds")
-        )
+        respx.post(settings.auth_url).mock(return_value=httpx.Response(401, text="bad creds"))
         tm = TokenManager(settings)
         with pytest.raises(AuthError):
             tm.get_token()
