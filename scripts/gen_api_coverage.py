@@ -90,8 +90,8 @@ def main() -> None:
     w("```")
     w("")
     w(
-        "← [Back to docs index](README.md) · [CLI reference](cli-reference.md) · "
-        "[MCP server](mcp-server.md)"
+        "← [Examples & recipes](examples.md) · [Docs index](README.md) · "
+        "[MCP server →](mcp-server.md)"
     )
     w("")
 

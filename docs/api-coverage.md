@@ -579,4 +579,4 @@ This page is derived from the live command tree so it can't drift from the code:
 uv run python scripts/gen_api_coverage.py
 ```
 
-← [Back to docs index](README.md) · [CLI reference](cli-reference.md) · [MCP server](mcp-server.md)
+← [Examples & recipes](examples.md) · [Docs index](README.md) · [MCP server →](mcp-server.md)

@@ -195,4 +195,4 @@ Run `st <module> --help` to list a group's commands, or browse the full
 
 ---
 
-← [Usage](usage.md) · [Docs index](README.md) · [API coverage →](api-coverage.md)
+← [Usage](usage.md) · [Docs index](README.md) · [Examples & recipes →](examples.md)
