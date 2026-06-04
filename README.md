@@ -22,10 +22,14 @@ Full docs live in **[`docs/`](docs/README.md)**:
 | [Configuration](docs/configuration.md) | `.env` variables, environments, OAuth/token caching, rate limits |
 | [Usage](docs/usage.md) | Global options, date ranges, pagination, `--filter`, export feeds |
 | [CLI reference](docs/cli-reference.md) | The 7 hand-tuned groups in depth + the generated-command pattern |
+| [Examples & recipes](docs/examples.md) | Sample command per module with timeframes, CLI + MCP paired |
 | [API coverage](docs/api-coverage.md) | Auto-generated inventory of every command across all 24 modules |
 | [MCP server](docs/mcp-server.md) | Running `st-mcp`, tool naming, pagination model, Claude hookup |
 | [Architecture](docs/architecture.md) | Registry + engine design, how to add a resource, internals |
 | [Development](docs/development.md) | Tests, lint, type-check, project layout |
+
+Release notes live in **[`CHANGELOG.md`](CHANGELOG.md)** — see
+[0.2.0 · Full API coverage](CHANGELOG.md#020--2026-06-03--full-servicetitan-api-coverage).
 
 ### Intended integration path: Customer-Built Apps only
 
