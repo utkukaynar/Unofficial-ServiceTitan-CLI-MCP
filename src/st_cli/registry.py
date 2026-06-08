@@ -82,6 +82,10 @@ class Resource:
     id_param: str = "id"  # name of the id argument, e.g. "estimate_id"
     date_filter: bool = False
     date_keys: tuple[str, str] = ("createdOnOrAfter", "createdBefore")
+    # Override the engine's default newest-first sort. Most ServiceTitan list
+    # endpoints accept "-modifiedOn", but a few (e.g. payroll/gross-pay-items)
+    # have their own enum and 400 on anything outside it.
+    default_sort: str | None = None
     actions: tuple[Action, ...] = ()
     title: str = ""  # table title; defaults to a title-cased slug
 
@@ -462,7 +466,13 @@ MODULES: tuple[Module, ...] = (
         name="payroll",
         help="Payroll — gross pay items, adjustments, settings, timesheets (read)",
         resources=(
-            Resource("gross-pay-items", ops="LRCUD", id_param="item_id", date_filter=True),
+            Resource(
+                "gross-pay-items",
+                ops="LRCUD",
+                id_param="item_id",
+                date_filter=True,
+                default_sort="-date",  # endpoint only accepts ±date for sort
+            ),
             Resource("payroll-adjustments", ops="LRC", id_param="adjustment_id"),
             Resource(
                 "employee-payroll-settings",

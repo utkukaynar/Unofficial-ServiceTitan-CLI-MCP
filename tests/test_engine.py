@@ -230,6 +230,26 @@ class TestMcpFactories:
         tool(mcp_ctx, filters={"sort": "+id"}, sort="-modifiedOn")
         assert mock_client.get.call_args[1]["params"]["sort"] == "+id"
 
+    def test_list_tool_resource_default_sort_overrides_modifiedOn(
+        self, deps, mcp_ctx, mock_client
+    ):
+        """Resources with default_sort use it instead of -modifiedOn (e.g. payroll/gross-pay-items)."""
+        res = Resource("gross-pay-items", ops="L", date_filter=True, default_sort="-date")
+        tool = engine._make_list_tool("payroll", res, deps)
+        mock_client.get.return_value = make_envelope([])
+        tool(mcp_ctx)
+        assert mock_client.get.call_args[1]["params"]["sort"] == "-date"
+
+    def test_list_tool_explicit_sort_wins_over_resource_default(
+        self, deps, mcp_ctx, mock_client
+    ):
+        """Caller-supplied sort still wins over the resource's default_sort."""
+        res = Resource("gross-pay-items", ops="L", date_filter=True, default_sort="-date")
+        tool = engine._make_list_tool("payroll", res, deps)
+        mock_client.get.return_value = make_envelope([])
+        tool(mcp_ctx, sort="+date")
+        assert mock_client.get.call_args[1]["params"]["sort"] == "+date"
+
     def test_get_tool(self, deps, mcp_ctx, mock_client):
         tool = engine._make_get_tool("pricebook", Resource("services"), deps)
         mock_client.get.return_value = {"id": 5}
