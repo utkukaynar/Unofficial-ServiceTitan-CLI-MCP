@@ -126,7 +126,7 @@ class TestGeneratedActions:
         mock_client.post.return_value = {"status": "Sold"}
         invoke(["salestech", "estimates-sell", "7", "--data", '{"soldBy": 100}'])
         mock_client.post.assert_called_once_with(
-            "salestech", "estimates/7/sell", json_body={"soldBy": 100}
+            "sales", "estimates/7/sell", json_body={"soldBy": 100}
         )
 
     def test_collection_action_no_id(self, invoke, mock_client):
@@ -149,7 +149,7 @@ class TestGeneratedActions:
         mock_client.put.return_value = {"id": 1}
         invoke(["salestech", "estimates-put-item", "7", "--data", '{"skuId": 5}'])
         mock_client.put.assert_called_once_with(
-            "salestech", "estimates/7/items", json_body={"skuId": 5}
+            "sales", "estimates/7/items", json_body={"skuId": 5}
         )
 
     def test_delete_verb_action(self, invoke, mock_client):
@@ -197,6 +197,38 @@ class TestMcpFactories:
         assert out["data"] == [{"id": 1}]
         assert mock_client.get.call_args[0][:2] == ("pricebook", "services")
         assert mock_client.get.call_args[1]["params"]["active"] is True
+
+    def test_list_tool_no_default_sort_when_no_date_filter(self, deps, mcp_ctx, mock_client):
+        """Resources without date_filter don't get an implicit sort — preserve API default."""
+        res = Resource("services", ops="L")
+        tool = engine._make_list_tool("pricebook", res, deps)
+        mock_client.get.return_value = make_envelope([])
+        tool(mcp_ctx)
+        assert "sort" not in mock_client.get.call_args[1]["params"]
+
+    def test_list_tool_date_filtered_defaults_to_recent_first(self, deps, mcp_ctx, mock_client):
+        """Date-filterable resources default to -modifiedOn so "latest" requests work."""
+        res = Resource("estimates", ops="L", date_filter=True)
+        tool = engine._make_list_tool("sales", res, deps)
+        mock_client.get.return_value = make_envelope([])
+        tool(mcp_ctx)
+        assert mock_client.get.call_args[1]["params"]["sort"] == "-modifiedOn"
+
+    def test_list_tool_explicit_sort_wins(self, deps, mcp_ctx, mock_client):
+        """Caller's `sort` arg overrides the date-filter default."""
+        res = Resource("estimates", ops="L", date_filter=True)
+        tool = engine._make_list_tool("sales", res, deps)
+        mock_client.get.return_value = make_envelope([])
+        tool(mcp_ctx, sort="+createdOn")
+        assert mock_client.get.call_args[1]["params"]["sort"] == "+createdOn"
+
+    def test_list_tool_sort_in_filters_wins_over_arg(self, deps, mcp_ctx, mock_client):
+        """`filters={'sort': ...}` takes precedence over the `sort` argument and the default."""
+        res = Resource("estimates", ops="L", date_filter=True)
+        tool = engine._make_list_tool("sales", res, deps)
+        mock_client.get.return_value = make_envelope([])
+        tool(mcp_ctx, filters={"sort": "+id"}, sort="-modifiedOn")
+        assert mock_client.get.call_args[1]["params"]["sort"] == "+id"
 
     def test_get_tool(self, deps, mcp_ctx, mock_client):
         tool = engine._make_get_tool("pricebook", Resource("services"), deps)

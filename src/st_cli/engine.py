@@ -353,6 +353,7 @@ def _make_list_tool(module: str, resource: Resource, deps: McpDeps) -> Callable[
     def _tool(
         ctx: Context,
         filters: dict[str, Any] | None = None,
+        sort: str | None = None,
         date_range: str | None = None,
         created_after: str | None = None,
         created_before: str | None = None,
@@ -370,11 +371,27 @@ def _make_list_tool(module: str, resource: Resource, deps: McpDeps) -> Callable[
                 start_key=start_key,
                 end_key=end_key,
             )
+        # ServiceTitan list endpoints have no documented default order and observe
+        # ascending-by-id in practice — so "latest" requests return the oldest
+        # records first. Default date-filterable resources to newest-first
+        # (-modifiedOn) so "give me the latest estimates" works as a human reads
+        # it. Explicit sort (param or filters) always wins.
+        if "sort" not in params:
+            if sort is not None:
+                params["sort"] = sort
+            elif has_date:
+                params["sort"] = "-modifiedOn"
         return deps.paginate(
             deps.get_client(ctx), module, path, params, page, page_size, max_results
         )
 
-    _tool.__doc__ = f"List {label.lower()}. Optional `filters` dict of query params."
+    sort_note = (
+        " Sorted by `-modifiedOn` (newest first) by default; pass `sort` "
+        "(e.g. `+createdOn`) or `filters={'sort': ...}` to override."
+        if has_date
+        else " Pass `sort` (e.g. `-modifiedOn`) for explicit ordering."
+    )
+    _tool.__doc__ = f"List {label.lower()}. Optional `filters` dict of query params.{sort_note}"
     return _tool
 
 

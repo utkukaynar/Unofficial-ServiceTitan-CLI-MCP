@@ -103,7 +103,8 @@ class TestRoutingBugFixes:
         mock_client.get.return_value = make_envelope([{"id": 1, "status": "Open"}])
         result = invoke(["salestech", "estimates-list"])
         assert result.exit_code == 0
-        assert mock_client.get.call_args[0][:2] == ("salestech", "estimates")
+        # CLI group is "salestech", but the URL prefix is /sales/v2/ (real ST path)
+        assert mock_client.get.call_args[0][:2] == ("sales", "estimates")
 
     def test_accounting_no_longer_has_estimates(self):
         from st_cli.commands import accounting
