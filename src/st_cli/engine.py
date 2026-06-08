@@ -343,16 +343,18 @@ class McpDeps:
 
 
 def _make_list_tool(module: str, resource: Resource, deps: McpDeps) -> Callable[..., Any]:
-
     path = resource.api_path
     label = _title(resource)
     start_key, end_key = resource.date_keys
     has_date = resource.date_filter
+    # Per-resource override (e.g. payroll/gross-pay-items only accepts ±date).
+    default_sort = resource.default_sort or ("-modifiedOn" if has_date else None)
     default_max = deps.default_max_results
 
     def _tool(
         ctx: Context,
         filters: dict[str, Any] | None = None,
+        sort: str | None = None,
         date_range: str | None = None,
         created_after: str | None = None,
         created_before: str | None = None,
@@ -370,16 +372,30 @@ def _make_list_tool(module: str, resource: Resource, deps: McpDeps) -> Callable[
                 start_key=start_key,
                 end_key=end_key,
             )
+        # ServiceTitan list endpoints have no documented default order and observe
+        # ascending-by-id in practice — so "latest" requests return the oldest
+        # records first. Default to newest-first so "give me the latest X" works
+        # as a human reads it. Explicit sort (param or filters) always wins.
+        if "sort" not in params:
+            if sort is not None:
+                params["sort"] = sort
+            elif default_sort is not None:
+                params["sort"] = default_sort
         return deps.paginate(
             deps.get_client(ctx), module, path, params, page, page_size, max_results
         )
 
-    _tool.__doc__ = f"List {label.lower()}. Optional `filters` dict of query params."
+    sort_note = (
+        " Sorted by `-modifiedOn` (newest first) by default; pass `sort` "
+        "(e.g. `+createdOn`) or `filters={'sort': ...}` to override."
+        if has_date
+        else " Pass `sort` (e.g. `-modifiedOn`) for explicit ordering."
+    )
+    _tool.__doc__ = f"List {label.lower()}. Optional `filters` dict of query params.{sort_note}"
     return _tool
 
 
 def _make_get_tool(module: str, resource: Resource, deps: McpDeps) -> Callable[..., Any]:
-
     path = resource.api_path
     label = _title(resource)
 
@@ -391,7 +407,6 @@ def _make_get_tool(module: str, resource: Resource, deps: McpDeps) -> Callable[.
 
 
 def _make_create_tool(module: str, resource: Resource, deps: McpDeps) -> Callable[..., Any]:
-
     path = resource.api_path
     label = _title(resource)
 
@@ -405,7 +420,6 @@ def _make_create_tool(module: str, resource: Resource, deps: McpDeps) -> Callabl
 def _make_write_tool(
     module: str, resource: Resource, deps: McpDeps, *, verb: str
 ) -> Callable[..., Any]:
-
     path = resource.api_path
     label = _title(resource)
     method = "patch" if verb == "PATCH" else "put"
@@ -419,7 +433,6 @@ def _make_write_tool(
 
 
 def _make_delete_tool(module: str, resource: Resource, deps: McpDeps) -> Callable[..., Any]:
-
     path = resource.api_path
     label = _title(resource)
 
@@ -434,7 +447,6 @@ def _make_delete_tool(module: str, resource: Resource, deps: McpDeps) -> Callabl
 def _make_action_tool(
     module: str, resource: Resource, action: Action, deps: McpDeps
 ) -> Callable[..., Any]:
-
     path = resource.api_path
     label = _title(resource)
     method = action.verb.lower()
@@ -474,7 +486,6 @@ def _make_action_tool(
 
 
 def _make_export_tool(module: str, feed: str, deps: McpDeps) -> Callable[..., Any]:
-
     default_max = deps.default_max_results
     cap = deps.max_results_cap
 
