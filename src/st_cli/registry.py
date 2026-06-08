@@ -428,7 +428,7 @@ MODULES: tuple[Module, ...] = (
         export_feeds=("purchase-orders", "receipts", "returns", "transfers", "adjustments"),
     ),
     Module(
-        name="salestech",
+        name="sales",
         group="salestech",
         help="Sales & Estimates — estimates, estimate/proposal templates",
         resources=(
