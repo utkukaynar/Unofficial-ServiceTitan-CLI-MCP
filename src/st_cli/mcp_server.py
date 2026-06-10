@@ -287,16 +287,20 @@ def st_jpm_jobs_list(
     date_range: str | None = None,
     created_after: str | None = None,
     created_before: str | None = None,
+    sort: str | None = None,
     page: int | None = None,
     page_size: int = 50,
     max_results: int = _DEFAULT_MAX_RESULTS,
 ) -> dict[str, Any]:
-    """List jobs. Filter by status, customer_id, or date range."""
+    """List jobs. Filter by status, customer_id, or date range. Optional `sort`,
+    e.g. `-completedOn` (newest first) or `+createdOn`."""
     params: dict[str, Any] = {}
     if status:
         params["jobStatus"] = status
     if customer_id:
         params["customerId"] = customer_id
+    if sort:
+        params["sort"] = sort
     apply_date_params(params, date_range, created_after, created_before)
     return _paginate(_get_client(ctx), "jpm", "jobs", params, page, page_size, max_results)
 

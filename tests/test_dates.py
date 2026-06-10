@@ -140,6 +140,16 @@ class TestExplicitDates:
     def test_date_range(self):
         assert parse_date_range("2025-01-01:2025-01-31") == (date(2025, 1, 1), date(2025, 1, 31))
 
+    def test_date_range_dotdot_separator(self):
+        assert parse_date_range("2025-01-01..2025-01-31") == (date(2025, 1, 1), date(2025, 1, 31))
+
+    def test_date_range_dotdot_same_day(self):
+        assert parse_date_range("2026-01-02..2026-01-02") == (date(2026, 1, 2), date(2026, 1, 2))
+
+    def test_bad_dotdot_range_raises(self):
+        with pytest.raises(DateParseError):
+            parse_date_range("bad..dates")
+
 
 class TestApplyDateParams:
     def test_default_keys_are_created(self):
