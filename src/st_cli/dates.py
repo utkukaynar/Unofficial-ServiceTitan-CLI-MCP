@@ -122,7 +122,10 @@ def parse_date_range(value: str) -> tuple[date, date]:
     if val == "last-year":
         return date(today.year - 1, 1, 1), date(today.year - 1, 12, 31)
 
-    # Explicit: single date or range
+    # Explicit: single date or range. Accept ".." as a separator alias — LLM callers
+    # routinely emit "2025-01-01..2025-01-31" since it's the common range convention.
+    if ".." in val:
+        val = val.replace("..", ":", 1)
     if ":" in val:
         parts = val.split(":", 1)
         try:

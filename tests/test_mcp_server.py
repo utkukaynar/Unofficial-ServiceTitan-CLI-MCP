@@ -259,6 +259,13 @@ class TestJPMTools:
         assert call_params["customerId"] == 42
         assert "createdOnOrAfter" in call_params
 
+    def test_jobs_list_with_sort(self, mock_ctx, mock_client):
+        from st_cli.mcp_server import st_jpm_jobs_list
+
+        mock_client.get.return_value = make_envelope([{"id": 1}])
+        st_jpm_jobs_list(mock_ctx, sort="-completedOn")
+        assert mock_client.get.call_args[1]["params"]["sort"] == "-completedOn"
+
     def test_jobs_get(self, mock_ctx, mock_client):
         from st_cli.mcp_server import st_jpm_jobs_get
 
