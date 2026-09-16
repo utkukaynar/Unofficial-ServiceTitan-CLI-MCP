@@ -2,9 +2,11 @@
 
 Deliberately exercises the contract's awkward cells rather than a happy path — a
 null price, a withdrawn item, an item in two categories, a repeated asset, an
-asset that is an authenticated storage path instead of an HTTPS URL, and a child
-category. Ticket 04's recorded fixtures can be taken straight off the grid this
-produces.
+asset that is an authenticated storage path instead of an HTTPS URL, a child
+category, a null cost beside a real ``0`` cost, and a service (which ServiceTitan
+gives no cost field at all) beside equipment and materials that have one.
+
+Ticket 04's recorded fixtures can be taken straight off the grid this produces.
 """
 
 from __future__ import annotations
@@ -20,6 +22,7 @@ SERVICE_1 = {
     "displayName": "Annual Tune-Up",
     "description": "Yearly service",
     "price": 129,
+    "hours": 1.5,
     "active": True,
     "categories": [{"id": 10, "name": "Service"}],
     "manufacturer": None,
@@ -34,6 +37,7 @@ SERVICE_2_NO_PRICE = {
     "name": "Quote On Site",
     "description": None,
     "price": None,
+    "hours": None,
     "active": False,
     "categories": [],
     "assets": [],
@@ -45,6 +49,8 @@ EQUIPMENT_1 = {
     "displayName": "16x7 Steel Door",
     "description": "Insulated",
     "price": 1299.5,
+    "cost": 640,
+    "hours": 3,
     "active": True,
     "categories": [{"id": 10, "name": "Service"}, {"id": 11, "name": "Doors"}],
     "manufacturer": "Acme",
@@ -62,6 +68,8 @@ MATERIAL_1 = {
     "displayName": "Torsion Spring",
     "description": "",
     "price": 0,
+    "cost": 0,
+    "hours": None,
     "active": True,
     "categories": [{"id": 11, "name": "Doors"}],
     "manufacturer": "Acme",

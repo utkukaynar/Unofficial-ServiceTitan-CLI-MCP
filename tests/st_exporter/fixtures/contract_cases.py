@@ -195,6 +195,24 @@ _SERVICE_3_UNKNOWN_ACTIVE = {
 }
 
 
+#: A material whose cost is explicitly null, sitting on the same tab as one whose
+#: cost is a real ``0``. Blank-is-not-zero is the rule a pricing formula breaks
+#: most expensively: a null cost read as zero prices the item at pure margin.
+_MATERIAL_2_NULL_COST = {
+    "id": 201,
+    "code": "MAT-2",
+    "displayName": "Bottom Seal",
+    "description": "Cost not recorded upstream",
+    "price": 24,
+    "cost": None,
+    "hours": 0,
+    "active": True,
+    "categories": [{"id": 11, "name": "Doors"}],
+    "assets": [],
+    "modifiedOn": "2026-09-06T00:00:00Z",
+}
+
+
 def _report_rows() -> list[dict[str, Any]]:
     """The Job Costing Summary report's rows, keyed by its own field names.
 
@@ -228,7 +246,7 @@ SOURCE_RECORDS: dict[str, list[dict[str, Any]]] = {
         {"code": "SVC-NO-ID", "displayName": "Dropped", "price": 1},
     ],
     "pricebook.equipment": [tenant_pricebook.EQUIPMENT_1],
-    "pricebook.materials": [tenant_pricebook.MATERIAL_1],
+    "pricebook.materials": [tenant_pricebook.MATERIAL_1, _MATERIAL_2_NULL_COST],
     "pricebook.categories": [tenant_pricebook.CATEGORY_10, tenant_pricebook.CATEGORY_11],
     "accounting.invoices": [tenant_financial.INVOICE_1, tenant_financial.INVOICE_2_NO_ITEMS],
     "payroll.timesheets": (
