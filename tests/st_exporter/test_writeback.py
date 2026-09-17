@@ -35,6 +35,19 @@ def _fixture_grid() -> list[list[str]]:
     return [list(fixture["columns"])] + [list(row) for row in fixture["rows"]]
 
 
+def _at_fixture_width(grid: list[list[str]]) -> list[list[str]]:
+    """Truncate a grid to the columns the committed `jobs.v2` fixture pins.
+
+    `JOB_COLUMNS` has since grown by 7 APPENDED Profit Wizard columns (see
+    `format.py`) that are additive under `docs/export-contract.md` and therefore
+    have no committed fixture of their own yet (`contracts.py`'s module
+    docstring). Comparing at the fixture's own width is what
+    `test_contract_fixtures.py` does for the same reason.
+    """
+    width = len(_fixture_grid()[0])
+    return [row[:width] for row in grid]
+
+
 def _item(payload: dict[str, Any], kind: str = "assign_technician") -> OutboxItem:
     return OutboxItem(id="item-1", idempotency_key="key-1", kind=kind, payload=payload)
 
@@ -112,7 +125,7 @@ class TestRowShapeMatchesTheFrozenFixture:
         result = apply_write_backs(
             before, [AssignmentWriteBack(appointment_id="100", job_id="1", assigned=("901",))]
         )
-        assert build_job_grid(result.rows) == _fixture_grid()
+        assert _at_fixture_width(build_job_grid(result.rows)) == _fixture_grid()
         assert result.rows_added == 1
         assert result.rows_removed == 0
 
@@ -219,7 +232,7 @@ class TestTheSheetWrite:
             [AssignmentWriteBack(appointment_id="100", assigned=("901",))]
         )
         assert calls == [("jobs", len(_fixture_grid()))]
-        assert store.tabs["jobs"] == _fixture_grid()
+        assert _at_fixture_width(store.tabs["jobs"]) == _fixture_grid()
 
     def test_nothing_is_written_when_nothing_changed(self) -> None:
         """A no-op write-back must not spend a Sheets write, nor risk failing one."""

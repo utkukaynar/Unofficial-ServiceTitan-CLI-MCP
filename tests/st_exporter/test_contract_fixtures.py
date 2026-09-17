@@ -92,11 +92,20 @@ def _what_to_do(tab_name: str, contract: contracts.FeedContract) -> str:
 
 @pytest.mark.parametrize("tab_name", _TAB_NAMES)
 def test_tab_columns_match_the_committed_fixture(tab_name: str) -> None:
-    """A renamed, removed, added or re-ordered column fails here, by name."""
+    """A renamed, removed or re-ordered column fails here, by name.
+
+    An APPENDED column does not, and that is the one difference from plain
+    equality. Appending is additive by ``docs/export-contract.md`` — consumers
+    look columns up by name and ignore the rest — so failing here would force
+    the version bump that rule exists to avoid. ``contracts.appended_columns``
+    is the single definition of "append" the generator asks too.
+    """
     contract, tab = _TAB_CONTRACTS[tab_name]
     committed = _load(tab_name)["columns"]
     current = list(tab.columns)
     if current == committed:
+        return
+    if contracts.appended_columns(committed, current):
         return
 
     renamed = [
@@ -133,8 +142,14 @@ def test_tab_rows_match_the_committed_fixture(tab_name: str) -> None:
     committed = _load(tab_name)
     produced = tab.build(SOURCE_RECORDS[tab_name])[1:]
     expected = [list(row) for row in committed["rows"]]
-    if produced == expected:
+    # Compare at the RELEASED width. An appended column adds a cell to every row,
+    # and those cells have no committed counterpart to compare against — the
+    # acknowledged cost of not bumping (see `contracts`' module docstring). Every
+    # cell the fixture DOES pin is still checked.
+    width = len(committed["columns"])
+    if [row[:width] for row in produced] == expected:
         return
+    produced = [row[:width] for row in produced]
 
     columns = committed["columns"]
     differences: list[str] = []
@@ -234,8 +249,19 @@ def test_manifest_checksums_match_the_committed_fixtures() -> None:
 
 
 def test_committed_suite_is_exactly_what_the_generator_produces() -> None:
-    """Belt and braces over the per-tab checks: nothing in the suite is stale."""
-    files = _generator().build_files()
+    """Belt and braces over the per-tab checks: nothing in the suite is stale.
+
+    "Produces" means what the generator would WRITE, which is why the additive
+    freeze is applied here exactly as ``main`` applies it — a released fixture
+    whose only difference is an appended column is deliberately left at its
+    released bytes, so comparing against the raw ``build_files`` payload would
+    report the suite as stale for doing precisely what it is supposed to do.
+    """
+    generator = _generator()
+    files = generator.build_files()
+    appends = generator.additive_appends(files, generator.load_register())
+    if appends:
+        generator.freeze_released_entries(files, appends)
     stale = [
         relative
         for relative, text in sorted(files.items())

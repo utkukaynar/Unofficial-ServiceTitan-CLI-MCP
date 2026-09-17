@@ -38,6 +38,7 @@ beside `exporter_version`.
 | `technicians` | **`technicians.v1`** | `technicians` |
 | `pricebook` | **`pricebook.v1`** | `pricebook.services`, `pricebook.equipment`, `pricebook.materials`, `pricebook.categories` |
 | `financial` | **`financial.v1`** | `accounting.invoices`, `payroll.timesheets`, `settings.businessUnits`, `reporting.jobCosts` |
+| `sales` | **`sales.v1`** | `sales.estimates` |
 
 The source of truth is `src/st_exporter/contracts.py`, and
 `contracts/fixtures/manifest.json` carries the same numbers in machine-readable
@@ -64,6 +65,13 @@ per appointment, `st_appointment_id` unique, same column set. Every version
 directory from `jobs.v2` onwards exists as files, and stays.
 
 `technicians` has never changed shape, so it is `technicians.v1`.
+
+`sales.estimates` is written by the `--feeds financial` run (same six-hourly
+cadence as `reporting.jobCosts`) but carries its own version, `sales.v1`, rather
+than joining `financial.v1` — it is a wholly new tab, and a tab added to an
+already-published contract version is refused by
+`scripts/gen_contract_fixtures.py` (see that file). Which run schedule refreshes
+a tab and what version a consumer pins its reader against are independent.
 
 ### A blank `contract_version`
 
@@ -155,6 +163,7 @@ contracts/fixtures/pricebook.v1/pricebook.services.json
 contracts/fixtures/pricebook.v1/…          (equipment, materials, categories)
 contracts/fixtures/financial.v1/accounting.invoices.json
 contracts/fixtures/financial.v1/…          (timesheets, businessUnits, jobCosts)
+contracts/fixtures/sales.v1/sales.estimates.json
 ```
 
 **Format is JSON**, because three of the four codebases are TypeScript and one is

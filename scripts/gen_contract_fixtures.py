@@ -264,7 +264,11 @@ def republish_refusals(version: str, files: dict[str, str]) -> list[str]:
     for name in sorted(set(released_names) & set(produced)):
         try:
             was = json.loads((on_disk / name).read_text(encoding="utf-8"))
-            now = json.loads(produced[name])
+            # Narrowed to the released columns: a republish rewrites the RELEASED
+            # bytes, and an appended column is not part of them. Without this an
+            # append makes every republish look like a column change and the
+            # typo-fix hatch stops working for as long as one is outstanding.
+            now = contracts.narrowed_to_released(was, json.loads(produced[name]))
         except (json.JSONDecodeError, OSError) as exc:
             refusals.append(f"{version}/{name} could not be compared as JSON: {exc}")
             continue
@@ -304,8 +308,94 @@ def _refuse_republish(version: str, refusals: list[str]) -> str:
     )
 
 
-def frozen_violations(
+def additive_appends(
     files: dict[str, str], register: dict[str, dict[str, str]]
+) -> dict[str, list[str]]:
+    """Relative path -> the columns it APPENDS to the released fixture.
+
+    Only pure appends appear here, as judged by ``contracts.additive_refusals`` —
+    the single definition both this script and the test suite ask, so the two can
+    never disagree about what "additive" means. Anything else is absent and is
+    left to :func:`frozen_violations` to refuse.
+
+    The released file is read from DISK rather than reconstructed, so the
+    register's recorded sha is checked against it FIRST and a mismatch is not an
+    append — a tampered register must not launder a rewrite into "additive".
+
+    Appearing here means the released file is left exactly as it is. Nothing is
+    rewritten, no sha moves, and the appended column ships with no committed
+    fixture until the next bump.
+    """
+    appends: dict[str, list[str]] = {}
+    for relative, text in sorted(files.items()):
+        version = contracts.version_of_fixture(relative)
+        if version is None:
+            continue
+        name = relative.rsplit("/", 1)[-1]
+        recorded = (register.get(version) or {}).get(name)
+        if recorded is None or recorded == _digest(text):
+            continue
+        released_path = REPO_ROOT / relative
+        if not released_path.exists():
+            continue
+        released_text = released_path.read_text(encoding="utf-8")
+        if _digest(released_text) != recorded:
+            continue
+        try:
+            released = json.loads(released_text)
+            current = json.loads(text)
+        except json.JSONDecodeError:
+            continue
+        if contracts.additive_refusals(released, current):
+            continue
+        added = contracts.appended_columns(
+            released.get("columns") or [], current.get("columns") or []
+        )
+        if added:
+            appends[relative] = added
+    return appends
+
+
+def _report_appends(appends: dict[str, list[str]]) -> None:
+    """Say out loud that a released fixture was left behind, and what it now lacks."""
+    if not appends:
+        return
+    print("\nAPPENDED COLUMN(S) — released fixtures left exactly as published:")
+    for relative, added in sorted(appends.items()):
+        print(f"  {relative}: + {', '.join(added)}")
+    print(
+        "This is additive under docs/export-contract.md, so the contract version is\n"
+        "NOT bumped and every consumer keeps parsing. The cost is that the appended\n"
+        "column has no committed fixture until the next bump: pin it with a unit test\n"
+        "here, and note it in CHANGELOG.md."
+    )
+
+
+def freeze_released_entries(files: dict[str, str], appends: dict[str, list[str]]) -> None:
+    """Drop every additively-changed fixture, and re-point the manifest at the released file.
+
+    In place, on the ``files`` map ``main`` is about to write. The fixture must
+    not be rewritten, AND the manifest entry that carries its ``sha256`` and
+    ``row_count`` must keep describing the file that is actually on disk.
+    """
+    manifest = json.loads(files[contracts.MANIFEST_PATH])
+    for relative in appends:
+        files.pop(relative, None)
+        released = (REPO_ROOT / relative).read_text(encoding="utf-8")
+        payload = json.loads(released)
+        for feed in manifest["feeds"].values():
+            entry = feed["tabs"].get(payload["tab"])
+            if entry is None or f"{contracts.FIXTURE_ROOT}/{entry['path']}" != relative:
+                continue
+            entry["sha256"] = _digest(released)
+            entry["row_count"] = len(payload.get("rows") or [])
+    files[contracts.MANIFEST_PATH] = render(manifest)
+
+
+def frozen_violations(
+    files: dict[str, str],
+    register: dict[str, dict[str, str]],
+    appends: dict[str, list[str]] | None = None,
 ) -> dict[str, list[str]]:
     """Version -> what would change under it, as lines. Empty is the good case.
 
@@ -325,6 +415,10 @@ def frozen_violations(
     """
     violations: dict[str, list[str]] = {}
     produced = produced_by_version(files)
+    # `appends` is keyed by repo-relative path; this loop works in
+    # `<version>/<file>`. Normalise once, here, rather than letting the two
+    # spellings drift apart.
+    additive = {relative.removeprefix(f"{contracts.FIXTURE_ROOT}/") for relative in (appends or {})}
 
     for version, produced_files in sorted(produced.items()):
         released = register.get(version)
@@ -333,6 +427,11 @@ def frozen_violations(
         for name, text in sorted(produced_files.items()):
             recorded = released.get(name)
             if recorded is not None and recorded == _digest(text):
+                continue
+            if f"{version}/{name}" in additive:
+                # An APPENDED column: additive by `docs/export-contract.md`, so it
+                # is not a rewrite to refuse. `main` drops it from what gets
+                # written, so nothing a pinned consumer tests against moves.
                 continue
             violations.setdefault(version, []).append(f"{version}/{name} would change")
 
@@ -407,7 +506,13 @@ def main() -> int:
         print(exc)
         return 2
 
-    violations = frozen_violations(files, register)
+    appends = additive_appends(files, register)
+    # Judged BEFORE the freeze, on the full set the code produces. Freezing first
+    # would remove the appended tab's file from `files` and trip the OTHER check
+    # in `frozen_violations` — "registered as released but the code no longer
+    # produces it" — which exists to catch a tab genuinely dropped, not one
+    # deliberately left at its released bytes.
+    violations = frozen_violations(files, register, appends)
     if args.republish and args.republish in violations:
         # Two gates, and the structural one is the load-bearing one: the CHANGELOG
         # line is an audit trail, not a constraint.
@@ -420,6 +525,10 @@ def main() -> int:
     if violations:
         print(_refuse(violations, args.republish))
         return 2
+
+    if appends:
+        freeze_released_entries(files, appends)
+        _report_appends(appends)
 
     for relative, text in sorted(files.items()):
         version = contracts.version_of_fixture(relative)

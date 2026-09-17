@@ -381,6 +381,26 @@ def build_job_rows(
                     "summary": job.get("summary"),
                     "business_unit": _business_unit_name(job, business_units),
                     "modified_on": appointment.get("modifiedOn") or job.get("modifiedOn"),
+                    # APPENDED columns for Profit Wizard hosted parity (see
+                    # `format.JOB_COLUMNS`). Read straight off the JOB record, never
+                    # derived or defaulted: a job ServiceTitan has not completed, has
+                    # no recall, carries no warranty, or was never marked no-charge
+                    # must stay BLANK, not "0"/"false" — collapsing "unknown" into a
+                    # falsy value is exactly the mistake `docs/export-contract.md`
+                    # calls out for money and booleans alike. `completed_on`,
+                    # `recall_for_id` and `warranty_id` are already read by Profit
+                    # Wizard's own Direct path off these exact field names
+                    # (`lib/crm/servicetitan.ts`), which is the strongest evidence
+                    # short of a recorded response; `no_charge`/`total`/
+                    # `business_unit_id`/`sold_by_id` are the same shape of read,
+                    # unverified against a live tenant (see KNOWN_UNVERIFIED.md).
+                    "completed_on": job.get("completedOn"),
+                    "recall_for_id": job.get("recallForId"),
+                    "warranty_id": job.get("warrantyId"),
+                    "no_charge": job.get("noCharge"),
+                    "total": job.get("total"),
+                    "business_unit_id": job.get("businessUnitId"),
+                    "sold_by_id": job.get("soldById"),
                     # Not a contract column; used by run.py to sort deterministically
                     # without re-deriving ints from formatted text.
                     "_sort_key": _sort_key(job.get("id"), appointment_id),
