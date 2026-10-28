@@ -208,7 +208,7 @@ EXTENSIONS: tuple[Module, ...] = (
                 ),
             ),
         ),
-        export_feeds=("jobs", "appointments", "projects"),
+        export_feeds=("jobs", "appointments", "projects", "job-notes", "job-history"),
     ),
     Module(
         name="dispatch",
