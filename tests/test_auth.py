@@ -113,3 +113,54 @@ class TestTokenManager:
         tm = TokenManager(settings)
         with pytest.raises(AuthError):
             tm.get_token()
+
+    @respx.mock
+    @patch("st_cli.auth.time.sleep")
+    def test_transport_error_retried_then_succeeds(self, sleep, settings, clean_cache):
+        route = respx.post(settings.auth_url).mock(
+            side_effect=[
+                httpx.ConnectError("nodename nor servname provided"),
+                httpx.Response(200, json={"access_token": "tok", "expires_in": 3600}),
+            ]
+        )
+        tm = TokenManager(settings)
+        assert tm.get_token() == "tok"
+        assert route.call_count == 2
+        sleep.assert_called_once_with(2.0)
+
+    @respx.mock
+    @patch("st_cli.auth.time.sleep")
+    def test_transport_error_exhausts_retries(self, sleep, settings, clean_cache):
+        route = respx.post(settings.auth_url).mock(
+            side_effect=httpx.ConnectError("nodename nor servname provided")
+        )
+        tm = TokenManager(settings)
+        with pytest.raises(AuthError, match="after 4 attempts"):
+            tm.get_token()
+        assert route.call_count == 4
+        assert [c.args[0] for c in sleep.call_args_list] == [2.0, 4.0, 8.0]
+
+    @respx.mock
+    @patch("st_cli.auth.time.sleep")
+    def test_5xx_retried(self, sleep, settings, clean_cache):
+        route = respx.post(settings.auth_url).mock(
+            side_effect=[
+                httpx.Response(503, text="unavailable"),
+                httpx.Response(200, json={"access_token": "tok", "expires_in": 3600}),
+            ]
+        )
+        tm = TokenManager(settings)
+        assert tm.get_token() == "tok"
+        assert route.call_count == 2
+
+    @respx.mock
+    @patch("st_cli.auth.time.sleep")
+    def test_4xx_not_retried(self, sleep, settings, clean_cache):
+        route = respx.post(settings.auth_url).mock(
+            return_value=httpx.Response(401, text="bad creds")
+        )
+        tm = TokenManager(settings)
+        with pytest.raises(AuthError, match="401"):
+            tm.get_token()
+        assert route.call_count == 1
+        sleep.assert_not_called()

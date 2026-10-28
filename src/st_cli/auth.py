@@ -14,6 +14,8 @@ from st_cli.exceptions import AuthError
 _CACHE_DIR = Path.home() / ".st_cli"
 _CACHE_FILE = _CACHE_DIR / "token_cache.json"
 _EARLY_EXPIRY_BUFFER = 60  # seconds
+_REFRESH_ATTEMPTS = 4
+_REFRESH_BACKOFF_BASE = 2.0  # seconds; sleeps 2, 4, 8 between attempts
 
 
 class TokenManager:
@@ -40,28 +42,46 @@ class TokenManager:
         return self._token is not None and time.time() < (self._expires_at - _EARLY_EXPIRY_BUFFER)
 
     def _refresh(self) -> str:
-        try:
-            resp = httpx.post(
-                self._settings.auth_url,
-                data={
-                    "grant_type": "client_credentials",
-                    "client_id": self._settings.client_id,
-                    "client_secret": self._settings.client_secret,
-                },
-            )
-            resp.raise_for_status()
-        except httpx.HTTPStatusError as exc:
-            raise AuthError(
-                f"Token request failed ({exc.response.status_code}): {exc.response.text}"
-            ) from exc
-        except httpx.RequestError as exc:
-            raise AuthError(f"Token request failed: {exc}") from exc
-
+        resp = self._post_token_request()
         data = resp.json()
         self._token = data["access_token"]
         self._expires_at = time.time() + data["expires_in"]
         self._save_to_file()
         return self._token  # type: ignore[return-value]
+
+    def _post_token_request(self) -> httpx.Response:
+        """POST the token request, retrying transient failures with backoff.
+
+        Transport errors (DNS, connect, timeout) and 5xx responses are retried
+        so a network blip can't kill an unattended long-running drain; 4xx is
+        definitive (bad credentials/config) and fails immediately.
+        """
+        attempt = 0
+        while True:
+            attempt += 1
+            try:
+                resp = httpx.post(
+                    self._settings.auth_url,
+                    data={
+                        "grant_type": "client_credentials",
+                        "client_id": self._settings.client_id,
+                        "client_secret": self._settings.client_secret,
+                    },
+                )
+                resp.raise_for_status()
+                return resp
+            except httpx.HTTPStatusError as exc:
+                if exc.response.status_code < 500 or attempt >= _REFRESH_ATTEMPTS:
+                    raise AuthError(
+                        f"Token request failed ({exc.response.status_code}): "
+                        f"{exc.response.text}"
+                    ) from exc
+            except httpx.RequestError as exc:
+                if attempt >= _REFRESH_ATTEMPTS:
+                    raise AuthError(
+                        f"Token request failed after {attempt} attempts: {exc}"
+                    ) from exc
+            time.sleep(_REFRESH_BACKOFF_BASE * 2 ** (attempt - 1))
 
     def _load_from_file(self) -> None:
         if not _CACHE_FILE.exists():
