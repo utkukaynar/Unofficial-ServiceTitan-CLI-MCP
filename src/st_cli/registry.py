@@ -598,7 +598,7 @@ MODULES: tuple[Module, ...] = (
         ),
     ),
     Module(
-        name="task-management",
+        name="taskmanagement",
         help="Task Management — tasks and subtasks",
         resources=(
             Resource(
@@ -616,6 +616,7 @@ MODULES: tuple[Module, ...] = (
             ),
             Resource("client-side-data", path="data", ops="L"),
         ),
+        group="task-management",
     ),
     Module(
         name="telecom",

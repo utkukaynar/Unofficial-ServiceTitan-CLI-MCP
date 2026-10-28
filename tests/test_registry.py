@@ -1,7 +1,8 @@
 """Integrity of the registry + the full generated CLI/MCP surface.
 
 These guard the invariants the engine relies on (unique names, valid ops/verbs)
-and lock in the two routing-bug fixes (estimates -> salestech, job types -> jpm).
+and lock in the routing-bug fixes (estimates -> salestech, job types -> jpm,
+tasks -> taskmanagement).
 """
 
 from __future__ import annotations
@@ -105,6 +106,15 @@ class TestRoutingBugFixes:
         assert result.exit_code == 0
         # CLI group is "salestech", but the URL prefix is /sales/v2/ (real ST path)
         assert mock_client.get.call_args[0][:2] == ("sales", "estimates")
+
+    def test_tasks_live_under_taskmanagement(self, invoke, mock_client):
+        from tests.conftest import make_envelope
+
+        mock_client.get.return_value = make_envelope([{"id": 1, "name": "Call customer"}])
+        result = invoke(["task-management", "tasks-list"])
+        assert result.exit_code == 0
+        # CLI group is "task-management", but the URL prefix is /taskmanagement/v2/ (real ST path)
+        assert mock_client.get.call_args[0][:2] == ("taskmanagement", "tasks")
 
     def test_accounting_no_longer_has_estimates(self):
         from st_cli.commands import accounting

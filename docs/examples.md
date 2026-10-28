@@ -245,7 +245,7 @@ st findings finding-assets-list
 
 MCP: `st_findings_list {"filters": {"jobId": 4567}}` · `st_findings_get {"record_id": 123}`
 
-## Task Management — `st task-management` · `st_task_management_*`
+## Task Management — `st task-management` · `st_taskmanagement_*`
 
 Tasks and subtasks.
 
