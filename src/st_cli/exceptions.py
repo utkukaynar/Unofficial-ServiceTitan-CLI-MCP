@@ -38,3 +38,7 @@ class RateLimitError(APIError):
 
 class DateParseError(STCLIError):
     """Failed to parse a date range string."""
+
+
+class UsageError(STCLIError):
+    """A command or tool was called with missing or malformed arguments."""

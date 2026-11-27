@@ -24,14 +24,21 @@ class TestFetchPage:
         mock_client.get.return_value = {"data": [], "hasMore": False, "totalCount": 0}
         fetch_page(mock_client, "crm", "customers", page=2, page_size=25)
         mock_client.get.assert_called_once_with(
-            "crm", "customers", params={"page": 2, "pageSize": 25}
+            "crm", "customers", params={"page": 2, "pageSize": 25}, version="v2"
         )
 
     def test_merges_extra_params(self, mock_client):
         mock_client.get.return_value = {"data": [], "hasMore": False}
         fetch_page(mock_client, "crm", "customers", params={"name": "Acme"}, page=1, page_size=50)
         expected_params = {"name": "Acme", "page": 1, "pageSize": 50}
-        mock_client.get.assert_called_once_with("crm", "customers", params=expected_params)
+        mock_client.get.assert_called_once_with(
+            "crm", "customers", params=expected_params, version="v2"
+        )
+
+    def test_passes_non_default_version(self, mock_client):
+        mock_client.get.return_value = {"data": [], "hasMore": False}
+        fetch_page(mock_client, "telecom", "calls", version="v3")
+        assert mock_client.get.call_args[1]["version"] == "v3"
 
     def test_returns_envelope(self, mock_client):
         envelope = {"data": [{"id": 1}], "hasMore": False, "totalCount": 1}
@@ -69,7 +76,7 @@ class TestFetchAll:
         mock_client.get.return_value = {"data": [], "hasMore": False}
         list(fetch_all(mock_client, "crm", "customers", page_size=10))
         mock_client.get.assert_called_once_with(
-            "crm", "customers", params={"page": 1, "pageSize": 10}
+            "crm", "customers", params={"page": 1, "pageSize": 10}, version="v2"
         )
 
 

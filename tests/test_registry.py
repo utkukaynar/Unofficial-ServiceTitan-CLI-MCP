@@ -53,10 +53,32 @@ class TestRegistryIntegrity:
             for resource in module.resources:
                 assert len(resource.date_keys) == 2
 
-    def test_covers_all_24_modules(self):
-        # 7 hand-written groups (one extension each except reporting) + 17 new
-        api_modules = {m.name for m in all_modules()} | {"reporting"}
-        assert len(api_modules) == 24
+    def test_covers_all_25_modules(self):
+        # 7 hand-written groups (each with an extension) + 18 registry-only modules
+        assert len({m.name for m in all_modules()}) == 25
+
+    def test_endpoint_verbs_valid(self):
+        for module in all_modules():
+            for endpoint in module.endpoints:
+                where = f"{module.name}.{endpoint.name}"
+                assert endpoint.verb in _VALID_VERBS | {"GET"}, where
+                assert not (endpoint.paged and endpoint.verb != "GET"), where
+                assert not (endpoint.body and endpoint.verb == "GET"), where
+
+    def test_names_unique_across_resources_and_endpoints(self):
+        """Endpoint names share one command namespace with the generated CRUD names."""
+        from st_cli.engine import _is_primary
+
+        verbs = dict(zip("LRCUPD", ("list", "get", "create", "update", "replace", "delete")))
+        for module in all_modules():
+            names: list[str] = []
+            for r in module.resources:
+                base = "" if _is_primary(module, r) else f"{r.slug}-"
+                names += [base + verbs[op] for op in r.ops]
+                names += [base + a.name for a in r.actions]
+            names += [e.name for e in module.endpoints]
+            dupes = {n for n in names if names.count(n) > 1}
+            assert not dupes, f"{module.name}: {dupes}"
 
 
 class TestNoCommandCollisions:

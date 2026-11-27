@@ -14,13 +14,14 @@ def fetch_page(
     params: dict[str, Any] | None = None,
     page: int = 1,
     page_size: int = 50,
+    version: str = "v2",
 ) -> dict[str, Any]:
     """Fetch a single page. Returns the full envelope (page, pageSize, hasMore, totalCount,
     data)."""
     p = dict(params or {})
     p["page"] = page
     p["pageSize"] = page_size
-    return client.get(module, resource, params=p)
+    return client.get(module, resource, params=p, version=version)
 
 
 def fetch_all(
@@ -29,11 +30,14 @@ def fetch_all(
     resource: str,
     params: dict[str, Any] | None = None,
     page_size: int = 50,
+    version: str = "v2",
 ) -> Iterator[dict[str, Any]]:
     """Auto-paginate until hasMore=False, yielding each record."""
     page = 1
     while True:
-        envelope = fetch_page(client, module, resource, params, page=page, page_size=page_size)
+        envelope = fetch_page(
+            client, module, resource, params, page=page, page_size=page_size, version=version
+        )
         for record in envelope.get("data", []):
             yield record
         if not envelope.get("hasMore", False):

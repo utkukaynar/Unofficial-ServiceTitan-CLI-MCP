@@ -1,4 +1,4 @@
-"""Settings commands: business units, job types."""
+"""Settings commands: business units."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from typing import Optional
 
 import typer
 
-from st_cli.output import Column, render
+from st_cli.output import Column, render, render_single
 from st_cli.pagination import fetch_all, fetch_page
 
 MODULE = "settings"
@@ -55,3 +55,12 @@ def business_units_list(
             title="Business Units",
             total_count=envelope.get("totalCount"),
         )
+
+
+@app.command("business-units-get")
+def business_units_get(
+    ctx: typer.Context, business_unit_id: int = typer.Argument(..., help="Business unit ID")
+) -> None:
+    """Get a single business unit by ID."""
+    data = ctx.obj["client"].get(MODULE, f"business-units/{business_unit_id}")
+    render_single(data, BUSINESS_UNIT_COLUMNS, as_json=ctx.obj["json"])

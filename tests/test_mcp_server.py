@@ -242,9 +242,11 @@ class TestCRMTools:
     def test_contacts_get(self, mock_ctx, mock_client):
         from st_cli.mcp_server import st_crm_contacts_get
 
-        mock_client.get.return_value = {"id": 10, "type": "Phone"}
-        result = st_crm_contacts_get(mock_ctx, contact_id=10)
+        guid = "3f2b8c1e-0000-4000-8000-000000000010"
+        mock_client.get.return_value = {"id": guid, "type": "Phone"}
+        result = st_crm_contacts_get(mock_ctx, contact_id=guid)
         assert result["type"] == "Phone"
+        mock_client.get.assert_called_once_with("crm", f"contacts/{guid}")
 
 
 class TestJPMTools:
@@ -284,10 +286,13 @@ class TestJPMTools:
     def test_jobs_cancel(self, mock_ctx, mock_client):
         from st_cli.mcp_server import st_jpm_jobs_cancel
 
-        mock_client.post.return_value = None
-        result = st_jpm_jobs_cancel(mock_ctx, job_id=7)
+        mock_client.put.return_value = None
+        result = st_jpm_jobs_cancel(mock_ctx, job_id=7, reason_id=2, memo="Dup")
         assert result["status"] == "cancelled"
         assert result["jobId"] == 7
+        mock_client.put.assert_called_once_with(
+            "jpm", "jobs/7/cancel", json_body={"reasonId": 2, "memo": "Dup"}
+        )
 
     def test_appointments_list(self, mock_ctx, mock_client):
         from st_cli.mcp_server import st_jpm_appointments_list
@@ -362,9 +367,17 @@ class TestAccountingTools:
     def test_invoices_get(self, mock_ctx, mock_client):
         from st_cli.mcp_server import st_accounting_invoices_get
 
-        mock_client.get.return_value = {"id": 1, "total": 500}
+        mock_client.get.return_value = make_envelope([{"id": 1, "total": 500}])
         result = st_accounting_invoices_get(mock_ctx, invoice_id=1)
         assert result["total"] == 500
+        mock_client.get.assert_called_once_with("accounting", "invoices", params={"ids": "1"})
+
+    def test_invoices_get_missing_maps_to_tool_error(self, mock_ctx, mock_client):
+        from st_cli.mcp_server import st_accounting_invoices_get
+
+        mock_client.get.return_value = make_envelope([])
+        with pytest.raises(ToolError, match="Not found"):
+            st_accounting_invoices_get(mock_ctx, invoice_id=42)
 
     def test_payments_list(self, mock_ctx, mock_client):
         from st_cli.mcp_server import st_accounting_payments_list

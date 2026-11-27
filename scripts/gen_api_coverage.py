@@ -43,14 +43,16 @@ def main() -> None:
     w("> **Auto-generated reference.** Regenerate with the snippet at the bottom of this page.")
     w("")
     w(
-        f"`st` / `st-mcp` cover **all 24 ServiceTitan API v2 modules** — "
+        f"`st` / `st-mcp` cover **all {len(groups)} ServiceTitan API modules** — "
         f"**{cmd_count} CLI commands** and **{tool_count} MCP tools** total."
     )
     w("")
     w(
         "Each CLI group below maps to one ServiceTitan module. The MCP tool for any command is "
-        "`st_{module}_{resource}_{action}` (job types live under `jpm`, estimates under "
-        "`salestech`). Run `st <group> --help` or `st <group> <command> --help` for options."
+        "`st_{module}_{resource}_{action}`, where the module is the API module — it differs "
+        "from the CLI group for `jobs` (`jpm`), `salestech` (`sales`) and `job-booking` "
+        "(`jbce`). Run `st <group> --help` or `st <group> <command> --help` for options, "
+        "including the path arguments of endpoint-style commands."
     )
     w("")
     w(

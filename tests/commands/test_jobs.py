@@ -61,12 +61,20 @@ class TestJobsGet:
 
 
 class TestJobsCancel:
-    def test_cancel(self, invoke, mock_client):
-        mock_client.post.return_value = None
-        result = invoke(["jobs", "cancel", "1"])
+    def test_cancel_puts_reason_and_memo(self, invoke, mock_client):
+        mock_client.put.return_value = None
+        result = invoke(["jobs", "cancel", "1", "--reason-id", "4", "--memo", "Customer called"])
         assert result.exit_code == 0
         assert "cancelled" in result.output
-        mock_client.post.assert_called_once_with("jpm", "jobs/1/cancel")
+        mock_client.put.assert_called_once_with(
+            "jpm", "jobs/1/cancel", json_body={"reasonId": 4, "memo": "Customer called"}
+        )
+        mock_client.post.assert_not_called()
+
+    def test_cancel_requires_reason_and_memo(self, invoke, mock_client):
+        result = invoke(["jobs", "cancel", "1"])
+        assert result.exit_code != 0
+        mock_client.put.assert_not_called()
 
 
 class TestAppointments:

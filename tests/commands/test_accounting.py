@@ -37,11 +37,22 @@ class TestInvoicesList:
 
 
 class TestInvoicesGet:
-    def test_get(self, invoke, mock_client):
-        mock_client.get.return_value = INVOICE
+    def test_get_filters_list_by_id(self, invoke, mock_client):
+        # ServiceTitan has no GET invoices/{id}; the command filters the list instead.
+        mock_client.get.return_value = make_envelope([INVOICE])
         result = invoke(["accounting", "invoices-get", "1"])
         assert result.exit_code == 0
         assert "INV-001" in result.output
+        mock_client.get.assert_called_once_with("accounting", "invoices", params={"ids": "1"})
+
+    def test_get_missing_invoice_raises_not_found(self, invoke, mock_client):
+        import pytest
+
+        from st_cli.exceptions import NotFoundError
+
+        mock_client.get.return_value = make_envelope([])
+        with pytest.raises(NotFoundError, match="Invoice 99 not found"):
+            invoke(["accounting", "invoices-get", "99"])
 
 
 class TestPayments:

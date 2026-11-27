@@ -16,6 +16,7 @@ from fastmcp.exceptions import ToolError
 
 from st_cli.availability import _build_busy_summary
 from st_cli.client import ServiceTitanClient
+from st_cli.commands.accounting import fetch_invoice
 from st_cli.commands.reporting import _report_rows_to_dicts
 from st_cli.config import load_settings
 from st_cli.dates import apply_date_params, validate_max_range
@@ -57,15 +58,17 @@ async def _lifespan(server: FastMCP) -> AsyncIterator[dict[str, Any]]:
 mcp = FastMCP(
     name="ServiceTitan",
     instructions=(
-        "ServiceTitan API v2 tools for home-services contractors — full coverage "
-        "across all 24 modules: CRM, Jobs/JPM, Dispatch, Pricebook, Inventory, "
-        "Sales & Estimates (salestech), Accounting, Memberships, Payroll, Settings, "
-        "Marketing (+Ads), Timesheets, Equipment Systems, Findings, Task Management, "
+        "ServiceTitan API tools for home-services contractors — full coverage "
+        "across all 25 modules: CRM, Jobs/JPM, Dispatch, Pricebook, Inventory, "
+        "Sales & Estimates, Accounting, Memberships, Payroll, Settings, "
+        "Marketing (+Ads), Timesheets, Equipment Systems, Findings, Fleet Pro, Task Management, "
         "Telecom, Customer Interactions, Forms, Reporting, Job Booking, Marketing "
         "Reputation, Scheduling Pro, and Service Agreements. "
-        "Tool names follow st_{module}_{resource}_{action} (e.g. st_salestech_estimates_sell, "
-        "st_inventory_purchase_orders_approve). Estimates live under salestech; job types "
+        "Tool names follow st_{module}_{resource}_{action} (e.g. st_sales_estimates_sell, "
+        "st_inventory_purchase_order_requests_approve). Estimates live under sales; job types "
         "under jpm. "
+        "Endpoint-style tools (nested or string IDs) take a `path` dict naming each path "
+        "parameter, e.g. path={'contactId': '…', 'contactMethodId': '…'}. "
         "List tools take an optional `filters` dict of query params and support pagination "
         "via `page` (single page) or auto-pagination up to `max_results`. "
         "Export tools (st_{module}_export_{feed}) stream change-feeds; pass `continue_from` "
@@ -96,6 +99,7 @@ def _paginate(
     page: int | None = None,
     page_size: int = 50,
     max_results: int = _DEFAULT_MAX_RESULTS,
+    version: str = "v2",
 ) -> dict[str, Any]:
     """Fetch data with smart pagination.
 
@@ -107,7 +111,9 @@ def _paginate(
     max_results = min(max_results, _MAX_RESULTS_CAP)
 
     if page is not None:
-        envelope = fetch_page(client, module, resource, params, page=page, page_size=page_size)
+        envelope = fetch_page(
+            client, module, resource, params, page=page, page_size=page_size, version=version
+        )
         return {
             "data": envelope.get("data", []),
             "totalCount": envelope.get("totalCount"),
@@ -116,7 +122,7 @@ def _paginate(
 
     collected: list[dict[str, Any]] = []
     truncated = False
-    for record in fetch_all(client, module, resource, params, page_size=page_size):
+    for record in fetch_all(client, module, resource, params, page_size=page_size, version=version):
         collected.append(record)
         if len(collected) >= max_results:
             truncated = True
@@ -240,20 +246,6 @@ def st_crm_bookings_get(ctx: Context, booking_id: int) -> dict[str, Any]:
     return _get_client(ctx).get("crm", f"bookings/{booking_id}")
 
 
-@mcp.tool(tags={"crm", "write"})
-@_handle_errors
-def st_crm_bookings_create(ctx: Context, data: dict[str, Any]) -> dict[str, Any]:
-    """Create a new booking."""
-    return _get_client(ctx).post("crm", "bookings", json_body=data)
-
-
-@mcp.tool(tags={"crm", "write"})
-@_handle_errors
-def st_crm_bookings_update(ctx: Context, booking_id: int, data: dict[str, Any]) -> dict[str, Any]:
-    """Update an existing booking."""
-    return _get_client(ctx).patch("crm", f"bookings/{booking_id}", json_body=data)
-
-
 @mcp.tool(tags={"crm", "read"})
 @_handle_errors
 def st_crm_contacts_list(
@@ -268,8 +260,8 @@ def st_crm_contacts_list(
 
 @mcp.tool(tags={"crm", "read"})
 @_handle_errors
-def st_crm_contacts_get(ctx: Context, contact_id: int) -> dict[str, Any]:
-    """Get a single contact by ID."""
+def st_crm_contacts_get(ctx: Context, contact_id: str) -> dict[str, Any]:
+    """Get a single contact by ID (a GUID string)."""
     return _get_client(ctx).get("crm", f"contacts/{contact_id}")
 
 
@@ -328,9 +320,11 @@ def st_jpm_jobs_update(ctx: Context, job_id: int, data: dict[str, Any]) -> dict[
 
 @mcp.tool(tags={"jpm", "write"})
 @_handle_errors
-def st_jpm_jobs_cancel(ctx: Context, job_id: int) -> dict[str, Any]:
-    """Cancel a job."""
-    _get_client(ctx).post("jpm", f"jobs/{job_id}/cancel")
+def st_jpm_jobs_cancel(ctx: Context, job_id: int, reason_id: int, memo: str) -> dict[str, Any]:
+    """Cancel a job. `reason_id` comes from st_jpm_job_cancel_reasons_list."""
+    _get_client(ctx).put(
+        "jpm", f"jobs/{job_id}/cancel", json_body={"reasonId": reason_id, "memo": memo}
+    )
     return {"status": "cancelled", "jobId": job_id}
 
 
@@ -600,7 +594,7 @@ def st_accounting_invoices_list(
 @_handle_errors
 def st_accounting_invoices_get(ctx: Context, invoice_id: int) -> dict[str, Any]:
     """Get a single invoice by ID."""
-    return _get_client(ctx).get("accounting", f"invoices/{invoice_id}")
+    return fetch_invoice(_get_client(ctx), invoice_id)
 
 
 @mcp.tool(tags={"accounting", "read"})
@@ -830,7 +824,7 @@ def st_settings_business_units_get(ctx: Context, business_unit_id: int) -> dict[
 # ===========================================================================
 # Generated tools — the rest of the ServiceTitan surface, from the registry.
 # These cover every module/resource not hand-wrapped above (job types now live
-# under jpm, estimates under salestech — fixing the two prior routing bugs).
+# under jpm, estimates under sales — fixing the two prior routing bugs).
 # ===========================================================================
 
 _deps = McpDeps(

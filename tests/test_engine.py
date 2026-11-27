@@ -7,12 +7,10 @@ factories directly with a mock client.
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
-
 import pytest
 
 from st_cli import engine
-from st_cli.engine import McpDeps, _is_primary, _parse_filters, _tool_name
+from st_cli.engine import _is_primary, _parse_filters, _tool_name
 from st_cli.registry import Action, Module, Resource
 from tests.conftest import make_envelope
 
@@ -90,19 +88,21 @@ class TestGeneratedCrudCommands:
         mock_client.get.return_value = {"id": 5, "name": "Svc"}
         result = invoke(["pricebook", "services-get", "5"])
         assert result.exit_code == 0
-        mock_client.get.assert_called_once_with("pricebook", "services/5")
+        mock_client.get.assert_called_once_with("pricebook", "services/5", version="v2")
 
     def test_create(self, invoke, mock_client):
         mock_client.post.return_value = {"id": 9}
         result = invoke(["pricebook", "services-create", "--data", '{"name": "X"}'])
         assert result.exit_code == 0
-        mock_client.post.assert_called_once_with("pricebook", "services", json_body={"name": "X"})
+        mock_client.post.assert_called_once_with(
+            "pricebook", "services", json_body={"name": "X"}, version="v2"
+        )
 
     def test_update(self, invoke, mock_client):
         mock_client.patch.return_value = {"id": 9}
         invoke(["pricebook", "services-update", "9", "--data", '{"name": "Y"}'])
         mock_client.patch.assert_called_once_with(
-            "pricebook", "services/9", json_body={"name": "Y"}
+            "pricebook", "services/9", json_body={"name": "Y"}, version="v2"
         )
 
     def test_delete(self, invoke, mock_client):
@@ -110,23 +110,23 @@ class TestGeneratedCrudCommands:
         result = invoke(["pricebook", "services-delete", "9"])
         assert result.exit_code == 0
         assert "deleted" in result.output
-        mock_client.delete.assert_called_once_with("pricebook", "services/9")
+        mock_client.delete.assert_called_once_with("pricebook", "services/9", version="v2")
 
 
 class TestGeneratedActions:
     def test_action_with_id_no_body(self, invoke, mock_client):
-        mock_client.post.return_value = None
-        result = invoke(["inventory", "purchase-orders-approve", "3"])
+        mock_client.patch.return_value = None
+        result = invoke(["inventory", "purchase-order-requests-approve", "3"])
         assert result.exit_code == 0
-        mock_client.post.assert_called_once_with(
-            "inventory", "purchase-orders/3/approve", json_body=None
+        mock_client.patch.assert_called_once_with(
+            "inventory", "purchase-orders/requests/3/approve", json_body=None, version="v2"
         )
 
     def test_action_with_id_and_body(self, invoke, mock_client):
-        mock_client.post.return_value = {"status": "Sold"}
+        mock_client.put.return_value = {"status": "Sold"}
         invoke(["salestech", "estimates-sell", "7", "--data", '{"soldBy": 100}'])
-        mock_client.post.assert_called_once_with(
-            "sales", "estimates/7/sell", json_body={"soldBy": 100}
+        mock_client.put.assert_called_once_with(
+            "sales", "estimates/7/sell", json_body={"soldBy": 100}, version="v2"
         )
 
     def test_collection_action_no_id(self, invoke, mock_client):
@@ -143,19 +143,22 @@ class TestGeneratedActions:
             "dispatch",
             "appointment-assignments/assign-technicians",
             json_body={"jobAppointmentId": 1, "technicianIds": [2]},
+            version="v2",
         )
 
     def test_put_action(self, invoke, mock_client):
         mock_client.put.return_value = {"id": 1}
         invoke(["salestech", "estimates-put-item", "7", "--data", '{"skuId": 5}'])
         mock_client.put.assert_called_once_with(
-            "sales", "estimates/7/items", json_body={"skuId": 5}
+            "sales", "estimates/7/items", json_body={"skuId": 5}, version="v2"
         )
 
     def test_delete_verb_action(self, invoke, mock_client):
         mock_client.delete.return_value = None
         invoke(["jobs", "appointments-remove-hold", "4"])
-        mock_client.delete.assert_called_once_with("jpm", "appointments/4/hold", json_body=None)
+        mock_client.delete.assert_called_once_with(
+            "jpm", "appointments/4/hold", json_body=None, version="v2"
+        )
 
 
 class TestGeneratedExport:
@@ -172,20 +175,6 @@ class TestGeneratedExport:
 # ---------------------------------------------------------------------------
 # Generated MCP tools (via the engine factories directly)
 # ---------------------------------------------------------------------------
-
-
-@pytest.fixture()
-def mcp_ctx(mock_client):
-    ctx = MagicMock()
-    ctx.lifespan_context = {"client": mock_client}
-    return ctx
-
-
-@pytest.fixture()
-def deps():
-    from st_cli.mcp_server import _get_client, _handle_errors, _paginate
-
-    return McpDeps(_get_client, _paginate, _handle_errors, 1000, 200)
 
 
 class TestMcpFactories:
@@ -230,19 +219,17 @@ class TestMcpFactories:
         tool(mcp_ctx, filters={"sort": "+id"}, sort="-modifiedOn")
         assert mock_client.get.call_args[1]["params"]["sort"] == "+id"
 
-    def test_list_tool_resource_default_sort_overrides_modifiedOn(
+    def test_list_tool_resource_default_sort_overrides_modified_on(
         self, deps, mcp_ctx, mock_client
     ):
-        """Resources with default_sort use it instead of -modifiedOn (e.g. payroll/gross-pay-items)."""
+        """default_sort replaces -modifiedOn (e.g. payroll/gross-pay-items only takes ±date)."""
         res = Resource("gross-pay-items", ops="L", date_filter=True, default_sort="-date")
         tool = engine._make_list_tool("payroll", res, deps)
         mock_client.get.return_value = make_envelope([])
         tool(mcp_ctx)
         assert mock_client.get.call_args[1]["params"]["sort"] == "-date"
 
-    def test_list_tool_explicit_sort_wins_over_resource_default(
-        self, deps, mcp_ctx, mock_client
-    ):
+    def test_list_tool_explicit_sort_wins_over_resource_default(self, deps, mcp_ctx, mock_client):
         """Caller-supplied sort still wins over the resource's default_sort."""
         res = Resource("gross-pay-items", ops="L", date_filter=True, default_sort="-date")
         tool = engine._make_list_tool("payroll", res, deps)
@@ -254,13 +241,15 @@ class TestMcpFactories:
         tool = engine._make_get_tool("pricebook", Resource("services"), deps)
         mock_client.get.return_value = {"id": 5}
         assert tool(mcp_ctx, record_id=5) == {"id": 5}
-        mock_client.get.assert_called_once_with("pricebook", "services/5")
+        mock_client.get.assert_called_once_with("pricebook", "services/5", version="v2")
 
     def test_create_tool(self, deps, mcp_ctx, mock_client):
         tool = engine._make_create_tool("pricebook", Resource("services"), deps)
         mock_client.post.return_value = {"id": 1}
         tool(mcp_ctx, data={"name": "X"})
-        mock_client.post.assert_called_once_with("pricebook", "services", json_body={"name": "X"})
+        mock_client.post.assert_called_once_with(
+            "pricebook", "services", json_body={"name": "X"}, version="v2"
+        )
 
     def test_delete_tool_returns_status(self, deps, mcp_ctx, mock_client):
         tool = engine._make_delete_tool("pricebook", Resource("services"), deps)
@@ -274,7 +263,7 @@ class TestMcpFactories:
         out = tool(mcp_ctx, record_id=7, data={"soldBy": 1})
         assert out == {"status": "Sold"}
         mock_client.post.assert_called_once_with(
-            "salestech", "estimates/7/sell", json_body={"soldBy": 1}
+            "salestech", "estimates/7/sell", json_body={"soldBy": 1}, version="v2"
         )
 
     def test_action_tool_none_result_becomes_ok(self, deps, mcp_ctx, mock_client):

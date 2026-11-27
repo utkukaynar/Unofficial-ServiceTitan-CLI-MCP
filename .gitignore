@@ -16,3 +16,6 @@ htmlcov/
 .coverage
 FOR_UTKU.md
 .claude/settings.local.json
+
+# ServiceTitan OpenAPI specs (downloaded from the developer portal; API Terms 9.1 treat API docs as confidential)
+specs/

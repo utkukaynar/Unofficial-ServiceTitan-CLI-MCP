@@ -118,10 +118,15 @@ def jobs_update(
 
 
 @app.command("cancel")
-def jobs_cancel(ctx: typer.Context, job_id: int = typer.Argument(..., help="Job ID")) -> None:
-    """Cancel a job."""
+def jobs_cancel(
+    ctx: typer.Context,
+    job_id: int = typer.Argument(..., help="Job ID"),
+    reason_id: int = typer.Option(..., "--reason-id", help="Job cancel reason ID"),
+    memo: str = typer.Option(..., "--memo", help="Why the job is being cancelled"),
+) -> None:
+    """Cancel a job (see `st jobs job-cancel-reasons-list` for reason IDs)."""
     client = ctx.obj["client"]
-    client.post(MODULE, f"jobs/{job_id}/cancel")
+    client.put(MODULE, f"jobs/{job_id}/cancel", json_body={"reasonId": reason_id, "memo": memo})
     typer.echo(f"Job {job_id} cancelled.")
 
 

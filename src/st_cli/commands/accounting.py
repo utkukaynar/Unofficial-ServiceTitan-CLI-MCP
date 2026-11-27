@@ -1,12 +1,13 @@
-"""Accounting commands: invoices, estimates, payments."""
+"""Accounting commands: invoices, payments."""
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
 import typer
 
 from st_cli.dates import apply_date_params
+from st_cli.exceptions import NotFoundError
 from st_cli.output import Column, render, render_single
 from st_cli.pagination import fetch_all, fetch_page
 
@@ -70,13 +71,22 @@ def invoices_list(
         )
 
 
+def fetch_invoice(client: Any, invoice_id: int) -> dict[str, Any]:
+    """Fetch one invoice. The API has no ``invoices/{id}`` route, so filter the list."""
+    envelope = client.get(MODULE, "invoices", params={"ids": str(invoice_id)})
+    matches = envelope.get("data", [])
+    if not matches:
+        raise NotFoundError(f"Invoice {invoice_id} not found")
+    invoice: dict[str, Any] = matches[0]
+    return invoice
+
+
 @app.command("invoices-get")
 def invoices_get(
     ctx: typer.Context, invoice_id: int = typer.Argument(..., help="Invoice ID")
 ) -> None:
     """Get a single invoice by ID."""
-    client = ctx.obj["client"]
-    data = client.get(MODULE, f"invoices/{invoice_id}")
+    data = fetch_invoice(ctx.obj["client"], invoice_id)
     render_single(data, INVOICE_COLUMNS, as_json=ctx.obj["json"])
 
 

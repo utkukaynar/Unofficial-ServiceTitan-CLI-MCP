@@ -16,9 +16,10 @@ import typer
 from fastmcp import Context
 
 from st_cli.dates import apply_date_params
+from st_cli.exceptions import UsageError
 from st_cli.output import render, render_single
 from st_cli.pagination import fetch_all, fetch_export_all, fetch_page
-from st_cli.registry import Action, Module, Resource
+from st_cli.registry import PATH_PARAM, Action, Endpoint, Module, Resource
 
 _EXPORT_COLUMNS = (("ID", "id"), ("Active", "active"), ("Modified", "modifiedOn"))
 
@@ -48,6 +49,11 @@ def _tool_name(module: str, *parts: str) -> str:
     """Build an MCP tool name like ``st_marketing_ads_attributed_leads_list``."""
     chunks = [module, *parts]
     return "st_" + "_".join(c.replace("-", "_") for c in chunks)
+
+
+def _feed_slug(feed: str) -> str:
+    """Export feeds can be nested (``customers/contacts``); names can't contain ``/``."""
+    return feed.replace("/", "-")
 
 
 def _coerce(value: str) -> Any:
@@ -82,6 +88,7 @@ def _make_list_cmd(module: str, resource: Resource) -> Callable[..., None]:
     title = _title(resource)
     start_key, end_key = resource.date_keys
     has_date = resource.date_filter
+    ver = resource.version
 
     def _cmd(
         ctx: typer.Context,
@@ -105,10 +112,12 @@ def _make_list_cmd(module: str, resource: Resource) -> Callable[..., None]:
                 params, range_val, from_date, to_date, start_key=start_key, end_key=end_key
             )
         if all_pages:
-            data = list(fetch_all(client, module, path, params, page_size=page_size))
+            data = list(fetch_all(client, module, path, params, page_size=page_size, version=ver))
             render(data, cols, as_json=as_json, title=title)
         else:
-            envelope = fetch_page(client, module, path, params, page=page, page_size=page_size)
+            envelope = fetch_page(
+                client, module, path, params, page=page, page_size=page_size, version=ver
+            )
             render(
                 envelope.get("data", []),
                 cols,
@@ -131,7 +140,7 @@ def _make_get_cmd(module: str, resource: Resource) -> Callable[..., None]:
         record_id: int = typer.Argument(..., help=f"{label} ID"),
     ) -> None:
         client = ctx.obj["client"]
-        data = client.get(module, f"{path}/{record_id}")
+        data = client.get(module, f"{path}/{record_id}", version=resource.version)
         render_single(data, cols, as_json=ctx.obj["json"])
 
     _cmd.__doc__ = f"Get a single {label.lower()} by ID."
@@ -148,7 +157,7 @@ def _make_create_cmd(module: str, resource: Resource) -> Callable[..., None]:
         data: str = typer.Option(..., "--data", help="Record data as JSON"),
     ) -> None:
         client = ctx.obj["client"]
-        result = client.post(module, path, json_body=json.loads(data))
+        result = client.post(module, path, json_body=json.loads(data), version=resource.version)
         render_single(result or {}, cols, as_json=ctx.obj["json"])
 
     _cmd.__doc__ = f"Create a {label.lower()}."
@@ -169,7 +178,9 @@ def _make_write_cmd(module: str, resource: Resource, *, verb: str) -> Callable[.
         data: str = typer.Option(..., "--data", help="Fields as JSON"),
     ) -> None:
         client = ctx.obj["client"]
-        result = getattr(client, method)(module, f"{path}/{record_id}", json_body=json.loads(data))
+        result = getattr(client, method)(
+            module, f"{path}/{record_id}", json_body=json.loads(data), version=resource.version
+        )
         render_single(result or {}, cols, as_json=ctx.obj["json"])
 
     _cmd.__doc__ = f"{word} a {label.lower()}."
@@ -185,7 +196,7 @@ def _make_delete_cmd(module: str, resource: Resource) -> Callable[..., None]:
         record_id: int = typer.Argument(..., help=f"{label} ID"),
     ) -> None:
         client = ctx.obj["client"]
-        client.delete(module, f"{path}/{record_id}")
+        client.delete(module, f"{path}/{record_id}", version=resource.version)
         typer.echo(f"{label} {record_id} deleted.")
 
     _cmd.__doc__ = f"Delete a {label.lower()} by ID."
@@ -204,9 +215,7 @@ def _make_action_cmd(module: str, resource: Resource, action: Action) -> Callabl
         return f"{path}/{action.subpath}"
 
     def _call(client: Any, url: str, body: dict[str, Any] | None) -> Any:
-        if method == "delete":
-            return client.delete(module, url, json_body=body)
-        return getattr(client, method)(module, url, json_body=body)
+        return getattr(client, method)(module, url, json_body=body, version=resource.version)
 
     if action.needs_id and action.needs_body:
 
@@ -290,26 +299,192 @@ def _make_export_cmd(module: str, feed: str) -> Callable[..., None]:
     return _cmd
 
 
+def _fill_path(endpoint: Endpoint, values: dict[str, Any]) -> str:
+    """Substitute ``{placeholders}`` in an endpoint's path template."""
+    missing = [name for name in endpoint.path_params if values.get(name) in (None, "")]
+    if missing:
+        raise UsageError(
+            f"{endpoint.name} needs path parameter(s): {', '.join(missing)} (path: {endpoint.path})"
+        )
+    return PATH_PARAM.sub(lambda m: str(values[m.group(1)]), endpoint.path)
+
+
+def _positional_path(endpoint: Endpoint, args: Optional[list[str]]) -> dict[str, Any]:
+    """Map CLI positional args onto the endpoint's path parameters, in order."""
+    given = list(args or [])
+    expected = endpoint.path_params
+    if len(given) != len(expected):
+        shown = " ".join(f"<{p}>" for p in expected) or "(none)"
+        raise typer.BadParameter(f"expected path arguments {shown}, got {len(given)}")
+    return dict(zip(expected, given))
+
+
+def _echo_result(ctx: typer.Context, result: Any, message: str) -> None:
+    """Print an endpoint's response as JSON, or a confirmation when it returned nothing."""
+    if result in (None, "", {}, []):
+        typer.echo(message)
+        return
+    from st_cli.output import console
+
+    console.print_json(json.dumps(result, default=str))
+
+
+def _endpoint_help(endpoint: Endpoint) -> str:
+    args = " ".join(f"<{p}>" for p in endpoint.path_params)
+    summary = endpoint.help or f"{endpoint.verb} {endpoint.path}"
+    return f"{summary}\n\n{endpoint.verb} {endpoint.path}" + (
+        f"  — path args, in order: {args}" if args else ""
+    )
+
+
+def _make_endpoint_cmd(module: str, endpoint: Endpoint) -> Callable[..., None]:
+    """Build the CLI command for an endpoint.
+
+    The request logic lives in ``_run_paged`` / ``_run_call``; the six closures
+    below only differ in signature (paged vs body vs plain, with or without the
+    positional path arguments) so Typer's ``--help`` shows exactly what applies.
+    """
+    method = endpoint.verb.lower()
+    ver = endpoint.version
+    metavar = " ".join(p.upper() for p in endpoint.path_params)
+    has_args = bool(endpoint.path_params)
+
+    def _run_paged(
+        ctx: typer.Context,
+        path_args: Optional[list[str]],
+        filter_: Optional[list[str]],
+        page: int,
+        page_size: int,
+        all_pages: bool,
+    ) -> None:
+        client = ctx.obj["client"]
+        url = _cli_url(endpoint, path_args)
+        params = _parse_filters(filter_)
+        cols = list(endpoint.columns)
+        if all_pages:
+            data = list(fetch_all(client, module, url, params, page_size=page_size, version=ver))
+            render(data, cols, as_json=ctx.obj["json"], title=endpoint.name)
+            return
+        envelope = fetch_page(
+            client, module, url, params, page=page, page_size=page_size, version=ver
+        )
+        render(
+            envelope.get("data", []),
+            cols,
+            as_json=ctx.obj["json"],
+            title=endpoint.name,
+            total_count=envelope.get("totalCount"),
+        )
+
+    def _run_call(
+        ctx: typer.Context,
+        path_args: Optional[list[str]],
+        filter_: Optional[list[str]],
+        data: Optional[str],
+    ) -> None:
+        kwargs: dict[str, Any] = {"params": _parse_filters(filter_) or None, "version": ver}
+        if data is not None:
+            kwargs["json_body"] = json.loads(data)
+        result = getattr(ctx.obj["client"], method)(module, _cli_url(endpoint, path_args), **kwargs)
+        _echo_result(ctx, result, f"{endpoint.name}: done.")
+
+    path_arg = typer.Argument(..., metavar=metavar, help="Path parameters, in order")
+    filter_opt = typer.Option(None, "--filter", help="Query parameter key=value (repeatable)")
+    data_opt = typer.Option(..., "--data", help="Request body as JSON")
+    page_opt = typer.Option(1, help="Page number")
+    size_opt = typer.Option(50, help="Page size")
+    all_opt = typer.Option(False, "--all", help="Fetch all pages")
+
+    if endpoint.paged and has_args:
+
+        def _cmd(
+            ctx: typer.Context,
+            path_args: list[str] = path_arg,
+            filter_: Optional[list[str]] = filter_opt,
+            page: int = page_opt,
+            page_size: int = size_opt,
+            all_pages: bool = all_opt,
+        ) -> None:
+            _run_paged(ctx, path_args, filter_, page, page_size, all_pages)
+
+    elif endpoint.paged:
+
+        def _cmd(  # type: ignore[misc]
+            ctx: typer.Context,
+            filter_: Optional[list[str]] = filter_opt,
+            page: int = page_opt,
+            page_size: int = size_opt,
+            all_pages: bool = all_opt,
+        ) -> None:
+            _run_paged(ctx, None, filter_, page, page_size, all_pages)
+
+    elif endpoint.body and has_args:
+
+        def _cmd(  # type: ignore[misc]
+            ctx: typer.Context,
+            path_args: list[str] = path_arg,
+            data: str = data_opt,
+            filter_: Optional[list[str]] = filter_opt,
+        ) -> None:
+            _run_call(ctx, path_args, filter_, data)
+
+    elif endpoint.body:
+
+        def _cmd(  # type: ignore[misc]
+            ctx: typer.Context,
+            data: str = data_opt,
+            filter_: Optional[list[str]] = filter_opt,
+        ) -> None:
+            _run_call(ctx, None, filter_, data)
+
+    elif has_args:
+
+        def _cmd(  # type: ignore[misc]
+            ctx: typer.Context,
+            path_args: list[str] = path_arg,
+            filter_: Optional[list[str]] = filter_opt,
+        ) -> None:
+            _run_call(ctx, path_args, filter_, None)
+
+    else:
+
+        def _cmd(  # type: ignore[misc]
+            ctx: typer.Context,
+            filter_: Optional[list[str]] = filter_opt,
+        ) -> None:
+            _run_call(ctx, None, filter_, None)
+
+    _cmd.__doc__ = _endpoint_help(endpoint)
+    return _cmd
+
+
+def _cli_url(endpoint: Endpoint, path_args: Optional[list[str]]) -> str:
+    return _fill_path(endpoint, _positional_path(endpoint, path_args))
+
+
 def add_resource_commands(app: typer.Typer, module: Module) -> None:
     """Register every generated command for *module* onto an existing Typer app."""
+    api = module.api_module
     for resource in module.resources:
         base = "" if _is_primary(module, resource) else f"{resource.slug}-"
         if "L" in resource.ops:
-            app.command(f"{base}list")(_make_list_cmd(module.name, resource))
+            app.command(f"{base}list")(_make_list_cmd(api, resource))
         if "R" in resource.ops:
-            app.command(f"{base}get")(_make_get_cmd(module.name, resource))
+            app.command(f"{base}get")(_make_get_cmd(api, resource))
         if "C" in resource.ops:
-            app.command(f"{base}create")(_make_create_cmd(module.name, resource))
+            app.command(f"{base}create")(_make_create_cmd(api, resource))
         if "U" in resource.ops:
-            app.command(f"{base}update")(_make_write_cmd(module.name, resource, verb="PATCH"))
+            app.command(f"{base}update")(_make_write_cmd(api, resource, verb="PATCH"))
         if "P" in resource.ops:
-            app.command(f"{base}replace")(_make_write_cmd(module.name, resource, verb="PUT"))
+            app.command(f"{base}replace")(_make_write_cmd(api, resource, verb="PUT"))
         if "D" in resource.ops:
-            app.command(f"{base}delete")(_make_delete_cmd(module.name, resource))
+            app.command(f"{base}delete")(_make_delete_cmd(api, resource))
         for action in resource.actions:
-            app.command(f"{base}{action.name}")(_make_action_cmd(module.name, resource, action))
+            app.command(f"{base}{action.name}")(_make_action_cmd(api, resource, action))
+    for endpoint in module.endpoints:
+        app.command(endpoint.name)(_make_endpoint_cmd(api, endpoint))
     for feed in module.export_feeds:
-        app.command(f"export-{feed}")(_make_export_cmd(module.name, feed))
+        app.command(f"export-{_feed_slug(feed)}")(_make_export_cmd(api, feed))
 
 
 def build_cli_app(module: Module) -> typer.Typer:
@@ -382,7 +557,14 @@ def _make_list_tool(module: str, resource: Resource, deps: McpDeps) -> Callable[
             elif default_sort is not None:
                 params["sort"] = default_sort
         return deps.paginate(
-            deps.get_client(ctx), module, path, params, page, page_size, max_results
+            deps.get_client(ctx),
+            module,
+            path,
+            params,
+            page,
+            page_size,
+            max_results,
+            version=resource.version,
         )
 
     sort_note = (
@@ -400,7 +582,7 @@ def _make_get_tool(module: str, resource: Resource, deps: McpDeps) -> Callable[.
     label = _title(resource)
 
     def _tool(ctx: Context, record_id: int) -> dict[str, Any]:
-        return deps.get_client(ctx).get(module, f"{path}/{record_id}")
+        return deps.get_client(ctx).get(module, f"{path}/{record_id}", version=resource.version)
 
     _tool.__doc__ = f"Get a single {label.lower()} by ID."
     return _tool
@@ -411,7 +593,7 @@ def _make_create_tool(module: str, resource: Resource, deps: McpDeps) -> Callabl
     label = _title(resource)
 
     def _tool(ctx: Context, data: dict[str, Any]) -> dict[str, Any]:
-        return deps.get_client(ctx).post(module, path, json_body=data)
+        return deps.get_client(ctx).post(module, path, json_body=data, version=resource.version)
 
     _tool.__doc__ = f"Create a {label.lower()}."
     return _tool
@@ -426,7 +608,9 @@ def _make_write_tool(
     word = "Update" if verb == "PATCH" else "Replace"
 
     def _tool(ctx: Context, record_id: int, data: dict[str, Any]) -> dict[str, Any]:
-        return getattr(deps.get_client(ctx), method)(module, f"{path}/{record_id}", json_body=data)
+        return getattr(deps.get_client(ctx), method)(
+            module, f"{path}/{record_id}", json_body=data, version=resource.version
+        )
 
     _tool.__doc__ = f"{word} a {label.lower()}."
     return _tool
@@ -437,7 +621,7 @@ def _make_delete_tool(module: str, resource: Resource, deps: McpDeps) -> Callabl
     label = _title(resource)
 
     def _tool(ctx: Context, record_id: int) -> dict[str, Any]:
-        deps.get_client(ctx).delete(module, f"{path}/{record_id}")
+        deps.get_client(ctx).delete(module, f"{path}/{record_id}", version=resource.version)
         return {"status": "deleted", "id": record_id}
 
     _tool.__doc__ = f"Delete a {label.lower()} by ID."
@@ -458,7 +642,7 @@ def _make_action_tool(
         return f"{path}/{action.subpath}"
 
     def _call(client: Any, url: str, body: dict[str, Any] | None) -> Any:
-        result = getattr(client, method)(module, url, json_body=body)
+        result = getattr(client, method)(module, url, json_body=body, version=resource.version)
         return result if result is not None else {"status": "ok"}
 
     if action.needs_id and action.needs_body:
@@ -510,6 +694,75 @@ def _make_export_tool(module: str, feed: str, deps: McpDeps) -> Callable[..., An
     return _tool
 
 
+def _make_endpoint_tool(module: str, endpoint: Endpoint, deps: McpDeps) -> Callable[..., Any]:
+    method = endpoint.verb.lower()
+    ver = endpoint.version
+    default_max = deps.default_max_results
+
+    if endpoint.paged:
+
+        def _tool(
+            ctx: Context,
+            path: dict[str, Any] | None = None,
+            filters: dict[str, Any] | None = None,
+            page: int | None = None,
+            page_size: int = 50,
+            max_results: int = default_max,
+        ) -> Any:
+            url = _fill_path(endpoint, path or {})  # validate before touching the client
+            return deps.paginate(
+                deps.get_client(ctx),
+                module,
+                url,
+                dict(filters or {}),
+                page,
+                page_size,
+                max_results,
+                version=ver,
+            )
+
+    elif endpoint.body:
+
+        def _tool(  # type: ignore[misc]
+            ctx: Context,
+            data: dict[str, Any] | list[Any],
+            path: dict[str, Any] | None = None,
+            filters: dict[str, Any] | None = None,
+        ) -> Any:
+            url = _fill_path(endpoint, path or {})
+            result = getattr(deps.get_client(ctx), method)(
+                module,
+                url,
+                json_body=data,
+                params=filters or None,
+                version=ver,
+            )
+            return result if result is not None else {"status": "ok"}
+
+    else:
+
+        def _tool(  # type: ignore[misc]
+            ctx: Context,
+            path: dict[str, Any] | None = None,
+            filters: dict[str, Any] | None = None,
+        ) -> Any:
+            url = _fill_path(endpoint, path or {})
+            result = getattr(deps.get_client(ctx), method)(
+                module, url, params=filters or None, version=ver
+            )
+            return result if result is not None else {"status": "ok"}
+
+    keys = ", ".join(f"`{p}`" for p in endpoint.path_params)
+    summary = endpoint.help or f"{endpoint.verb} {endpoint.path}"
+    path_note = f" Required `path` keys: {keys}." if keys else ""
+    paged_note = " Paginated: `page` for one page, else auto-paginates to `max_results`."
+    _tool.__doc__ = (
+        f"{summary} ({endpoint.verb} {endpoint.path}).{path_note}"
+        f"{paged_note if endpoint.paged else ''} Optional `filters` dict of query params."
+    )
+    return _tool
+
+
 def register_mcp_tools(mcp: Any, module: Module, deps: McpDeps) -> None:
     """Register every generated FastMCP tool for *module* on the server."""
 
@@ -517,6 +770,7 @@ def register_mcp_tools(mcp: Any, module: Module, deps: McpDeps) -> None:
         tag = "write" if write else "read"
         mcp.tool(name=name, tags={module.name, tag})(deps.handle_errors(fn))
 
+    api = module.api_module
     for resource in module.resources:
         # Primary resource → omit the redundant slug (st_findings_list, not _findings_findings_list)
         parts = () if _is_primary(module, resource) else (resource.slug,)
@@ -525,34 +779,40 @@ def register_mcp_tools(mcp: Any, module: Module, deps: McpDeps) -> None:
             return _tool_name(module.name, *parts, action)
 
         if "L" in resource.ops:
-            _add(_name("list"), _make_list_tool(module.name, resource, deps), write=False)
+            _add(_name("list"), _make_list_tool(api, resource, deps), write=False)
         if "R" in resource.ops:
-            _add(_name("get"), _make_get_tool(module.name, resource, deps), write=False)
+            _add(_name("get"), _make_get_tool(api, resource, deps), write=False)
         if "C" in resource.ops:
-            _add(_name("create"), _make_create_tool(module.name, resource, deps), write=True)
+            _add(_name("create"), _make_create_tool(api, resource, deps), write=True)
         if "U" in resource.ops:
             _add(
                 _name("update"),
-                _make_write_tool(module.name, resource, deps, verb="PATCH"),
+                _make_write_tool(api, resource, deps, verb="PATCH"),
                 write=True,
             )
         if "P" in resource.ops:
             _add(
                 _name("replace"),
-                _make_write_tool(module.name, resource, deps, verb="PUT"),
+                _make_write_tool(api, resource, deps, verb="PUT"),
                 write=True,
             )
         if "D" in resource.ops:
-            _add(_name("delete"), _make_delete_tool(module.name, resource, deps), write=True)
+            _add(_name("delete"), _make_delete_tool(api, resource, deps), write=True)
         for action in resource.actions:
             _add(
                 _name(action.name),
-                _make_action_tool(module.name, resource, action, deps),
+                _make_action_tool(api, resource, action, deps),
                 write=True,
             )
+    for endpoint in module.endpoints:
+        _add(
+            _tool_name(module.name, endpoint.name),
+            _make_endpoint_tool(api, endpoint, deps),
+            write=endpoint.verb != "GET",
+        )
     for feed in module.export_feeds:
         _add(
-            _tool_name(module.name, "export", feed),
-            _make_export_tool(module.name, feed, deps),
+            _tool_name(module.name, "export", _feed_slug(feed)),
+            _make_export_tool(api, feed, deps),
             write=False,
         )

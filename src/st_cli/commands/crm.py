@@ -203,29 +203,8 @@ def bookings_get(
     render_single(data, BOOKING_COLUMNS, as_json=ctx.obj["json"])
 
 
-@app.command()
-def bookings_create(
-    ctx: typer.Context,
-    data: str = typer.Option(..., "--data", help="Booking data as JSON"),
-) -> None:
-    """Create a new booking."""
-    client = ctx.obj["client"]
-    body = json.loads(data)
-    result = client.post(MODULE, "bookings", json_body=body)
-    render_single(result, BOOKING_COLUMNS, as_json=ctx.obj["json"])
-
-
-@app.command()
-def bookings_update(
-    ctx: typer.Context,
-    booking_id: int = typer.Argument(..., help="Booking ID"),
-    data: str = typer.Option(..., "--data", help="Fields to update as JSON"),
-) -> None:
-    """Update an existing booking."""
-    client = ctx.obj["client"]
-    body = json.loads(data)
-    result = client.patch(MODULE, f"bookings/{booking_id}", json_body=body)
-    render_single(result, BOOKING_COLUMNS, as_json=ctx.obj["json"])
+# Bookings are created/updated through a booking provider — see the generated
+# provider-bookings-* commands. There is no tenant-level POST/PATCH bookings endpoint.
 
 
 # --- Contacts ---
@@ -257,7 +236,7 @@ def contacts_list(
 
 @app.command()
 def contacts_get(
-    ctx: typer.Context, contact_id: int = typer.Argument(..., help="Contact ID")
+    ctx: typer.Context, contact_id: str = typer.Argument(..., help="Contact ID (GUID)")
 ) -> None:
     """Get a single contact by ID."""
     client = ctx.obj["client"]
