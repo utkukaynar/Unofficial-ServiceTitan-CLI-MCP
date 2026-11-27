@@ -7,8 +7,13 @@
 st-mcp
 ```
 
-It serves **~394 tools** spanning all 24 ServiceTitan modules — the same surface
+It serves **~600 tools** spanning all 25 ServiceTitan modules — the same surface
 as the CLI (see [API coverage](api-coverage.md)).
+
+> ⚠️ **Using `st-mcp` is using an "AI System" under ServiceTitan's API Terms.**
+> The terms require you to disclose it to ServiceTitan and get approval, and
+> limit AI-driven calls to predefined operations. Read
+> [ServiceTitan API Terms](terms.md) before connecting an agent to a live tenant.
 
 ## Tool naming
 
@@ -16,15 +21,17 @@ as the CLI (see [API coverage](api-coverage.md)).
 
 | CLI command | MCP tool |
 |---|---|
-| `st salestech estimates-sell 123 --data …` | `st_salestech_estimates_sell` |
-| `st inventory purchase-orders-approve 678` | `st_inventory_purchase_orders_approve` |
+| `st salestech estimates-sell 123 --data …` | `st_sales_estimates_sell` |
+| `st inventory purchase-order-requests-approve 678` | `st_inventory_purchase_order_requests_approve` |
+| `st crm contacts-methods-get C_ID M_ID` | `st_crm_contacts_methods_get` |
 | `st pricebook services-create --data …` | `st_pricebook_services_create` |
 | `st jobs job-types-list` | `st_jpm_job_types_list` |
 | `st telecom export-calls` | `st_telecom_export_calls` |
 
 A resource named after its module drops the redundant segment
-(`st_findings_list`, not `st_findings_findings_list`). Job types are under `jpm`
-and estimates under `salestech` — the two prior routing bugs are fixed.
+(`st_memberships_update`, not `st_memberships_memberships_update`). The tool's
+module is the API module: job types are under `jpm`, estimates under `sales`
+(CLI group `salestech`), call reasons under `jbce` (CLI group `job-booking`).
 
 ## Tool shapes
 
@@ -33,6 +40,11 @@ and estimates under `salestech` — the two prior routing bugs are fixed.
   `max_results`.
 - **Get / delete / single-id actions** take `record_id`.
 - **Create / update / body actions** take a `data` dict.
+- **Endpoint-style tools** — nested paths, string IDs, bulk operations — take a
+  `path` dict naming every path parameter (the tool description lists the
+  required keys), plus optional `filters` (query params) and `data` (body):
+  `st_crm_contacts_methods_get {"path": {"contactId": "…", "contactMethodId": "…"}}`.
+  Paginated ones also take `page` / `page_size` / `max_results`.
 - **Export** tools (`st_{module}_export_{feed}`) take `continue_from` and return
   `{ data, continueFrom, totalCount }` — persist `continueFrom` and pass it back
   to fetch only newer changes.

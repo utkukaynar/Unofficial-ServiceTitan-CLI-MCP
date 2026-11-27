@@ -1,8 +1,9 @@
 # Documentation
 
 Docs for the unofficial ServiceTitan CLI (`st`) and MCP server (`st-mcp`).
-Start at the [project README](../README.md) for the overview and the
-Customer-Built-App integration-path warning.
+Start at the [project README](../README.md) for the overview, the
+Customer-Built-App integration-path warning, and the
+[ServiceTitan API Terms](terms.md) summary.
 
 ## Pages
 
@@ -13,8 +14,9 @@ Customer-Built-App integration-path warning.
 | [Usage](usage.md) | Global options, date ranges, pagination, quick start |
 | [CLI reference](cli-reference.md) | The hand-tuned groups in depth + the generated-command pattern |
 | [Examples & recipes](examples.md) | Sample command per module with timeframes, CLI + MCP paired |
-| [API coverage](api-coverage.md) | Auto-generated inventory of every command across all 24 modules |
+| [API coverage](api-coverage.md) | Auto-generated inventory of every command across all 25 modules |
 | [MCP server](mcp-server.md) | Running `st-mcp`, tool naming, pagination model, Claude hookup |
+| [ServiceTitan API Terms](terms.md) | The API Terms clauses that apply to this tool — read before using `st-mcp` |
 | [Architecture](architecture.md) | Registry + engine design, how to add a resource, internals |
 | [Development](development.md) | Tests, lint, type-check, project layout |
 | [Changelog](../CHANGELOG.md) | Release notes — what shipped in each version |
