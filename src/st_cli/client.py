@@ -16,7 +16,11 @@ _BACKOFF_BASE = 1.0  # seconds
 
 
 class ServiceTitanClient:
-    """HTTP client for ServiceTitan API v2."""
+    """HTTP client for the ServiceTitan REST API.
+
+    Most endpoints are ``v2``; a few newer ones (CRM leads create, telecom calls
+    feed, opt-outs) exist only under ``v3``, so every method takes ``version``.
+    """
 
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
@@ -32,11 +36,17 @@ class ServiceTitanClient:
             "ST-App-Key": self._settings.app_key,
         }
 
-    def _url(self, module: str, resource: str) -> str:
-        return f"/{module}/v2/tenant/{self._settings.tenant_id}/{resource}"
+    def _url(self, module: str, resource: str, version: str = "v2") -> str:
+        return f"/{module}/{version}/tenant/{self._settings.tenant_id}/{resource}"
 
-    def get(self, module: str, resource: str, params: dict[str, Any] | None = None) -> Any:
-        return self._request("GET", module, resource, params=params)
+    def get(
+        self,
+        module: str,
+        resource: str,
+        params: dict[str, Any] | None = None,
+        version: str = "v2",
+    ) -> Any:
+        return self._request("GET", module, resource, params=params, version=version)
 
     def post(
         self,
@@ -44,14 +54,35 @@ class ServiceTitanClient:
         resource: str,
         json_body: dict[str, Any] | None = None,
         params: dict[str, Any] | None = None,
+        version: str = "v2",
     ) -> Any:
-        return self._request("POST", module, resource, params=params, json_body=json_body)
+        return self._request(
+            "POST", module, resource, params=params, json_body=json_body, version=version
+        )
 
-    def patch(self, module: str, resource: str, json_body: dict[str, Any] | None = None) -> Any:
-        return self._request("PATCH", module, resource, json_body=json_body)
+    def patch(
+        self,
+        module: str,
+        resource: str,
+        json_body: dict[str, Any] | None = None,
+        params: dict[str, Any] | None = None,
+        version: str = "v2",
+    ) -> Any:
+        return self._request(
+            "PATCH", module, resource, params=params, json_body=json_body, version=version
+        )
 
-    def put(self, module: str, resource: str, json_body: dict[str, Any] | None = None) -> Any:
-        return self._request("PUT", module, resource, json_body=json_body)
+    def put(
+        self,
+        module: str,
+        resource: str,
+        json_body: dict[str, Any] | None = None,
+        params: dict[str, Any] | None = None,
+        version: str = "v2",
+    ) -> Any:
+        return self._request(
+            "PUT", module, resource, params=params, json_body=json_body, version=version
+        )
 
     def delete(
         self,
@@ -59,8 +90,11 @@ class ServiceTitanClient:
         resource: str,
         params: dict[str, Any] | None = None,
         json_body: dict[str, Any] | None = None,
+        version: str = "v2",
     ) -> Any:
-        return self._request("DELETE", module, resource, params=params, json_body=json_body)
+        return self._request(
+            "DELETE", module, resource, params=params, json_body=json_body, version=version
+        )
 
     def _request(
         self,
@@ -69,8 +103,9 @@ class ServiceTitanClient:
         resource: str,
         params: dict[str, Any] | None = None,
         json_body: dict[str, Any] | None = None,
+        version: str = "v2",
     ) -> Any:
-        url = self._url(module, resource)
+        url = self._url(module, resource, version)
         retries = 0
         refreshed = False
 

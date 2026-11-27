@@ -147,5 +147,9 @@ class TestContacts:
             "value": "a@b.com",
             "customerId": 10,
         }
-        result = invoke(["crm", "contacts-get", "1"])
+        result = invoke(["crm", "contacts-get", "3f2b8c1e-0000-4000-8000-000000000001"])
         assert result.exit_code == 0
+        # contact ids are GUIDs, so the argument must not be coerced to int
+        mock_client.get.assert_called_once_with(
+            "crm", "contacts/3f2b8c1e-0000-4000-8000-000000000001"
+        )

@@ -66,3 +66,20 @@ def invoke(runner: CliRunner, mock_client: MagicMock, settings: Settings):
             return runner.invoke(app, cli_args, catch_exceptions=False)
 
     return _invoke
+
+
+@pytest.fixture()
+def mcp_ctx(mock_client: MagicMock) -> MagicMock:
+    """A FastMCP context whose lifespan holds the mock client."""
+    ctx = MagicMock()
+    ctx.lifespan_context = {"client": mock_client}
+    return ctx
+
+
+@pytest.fixture()
+def deps():
+    """The real McpDeps the server wires into the engine."""
+    from st_cli.engine import McpDeps
+    from st_cli.mcp_server import _get_client, _handle_errors, _paginate
+
+    return McpDeps(_get_client, _paginate, _handle_errors, 1000, 200)
