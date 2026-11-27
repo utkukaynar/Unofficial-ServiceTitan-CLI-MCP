@@ -15,7 +15,7 @@ from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 
 from st_cli.availability import _build_busy_summary
-from st_cli.client import ServiceTitanClient
+from st_cli.client import ServiceTitanClient, path_segment
 from st_cli.commands.accounting import fetch_invoice
 from st_cli.commands.reporting import _report_rows_to_dicts
 from st_cli.config import load_settings
@@ -262,7 +262,7 @@ def st_crm_contacts_list(
 @_handle_errors
 def st_crm_contacts_get(ctx: Context, contact_id: str) -> dict[str, Any]:
     """Get a single contact by ID (a GUID string)."""
-    return _get_client(ctx).get("crm", f"contacts/{contact_id}")
+    return _get_client(ctx).get("crm", f"contacts/{path_segment(contact_id)}")
 
 
 # ===========================================================================
@@ -688,7 +688,7 @@ def st_reporting_reports_list(
     return _paginate(
         _get_client(ctx),
         "reporting",
-        f"report-category/{category_id}/reports",
+        f"report-category/{path_segment(category_id)}/reports",
         None,
         page,
         page_size,
@@ -708,7 +708,10 @@ def st_reporting_report_fields(
     Call this before st_reporting_report_data to discover what parameters
     (e.g. From, To dates) the report requires.
     """
-    return _get_client(ctx).get("reporting", f"report-category/{category_id}/reports/{report_id}")
+    return _get_client(ctx).get(
+        "reporting",
+        f"report-category/{path_segment(category_id)}/reports/{path_segment(report_id)}",
+    )
 
 
 @mcp.tool(tags={"reporting", "read"})
@@ -744,7 +747,7 @@ def st_reporting_report_data(
         parameters.extend(extra_parameters)
 
     body: dict[str, Any] = {"parameters": parameters}
-    resource = f"report-category/{category_id}/reports/{report_id}/data"
+    resource = f"report-category/{path_segment(category_id)}/reports/{path_segment(report_id)}/data"
 
     if page is not None:
         resp = client.post(

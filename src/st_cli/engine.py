@@ -15,6 +15,7 @@ from typing import Any, Callable, Optional
 import typer
 from fastmcp import Context
 
+from st_cli.client import path_segment
 from st_cli.dates import apply_date_params
 from st_cli.exceptions import UsageError
 from st_cli.output import render, render_single
@@ -306,7 +307,7 @@ def _fill_path(endpoint: Endpoint, values: dict[str, Any]) -> str:
         raise UsageError(
             f"{endpoint.name} needs path parameter(s): {', '.join(missing)} (path: {endpoint.path})"
         )
-    return PATH_PARAM.sub(lambda m: str(values[m.group(1)]), endpoint.path)
+    return PATH_PARAM.sub(lambda m: path_segment(values[m.group(1)]), endpoint.path)
 
 
 def _positional_path(endpoint: Endpoint, args: Optional[list[str]]) -> dict[str, Any]:

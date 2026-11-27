@@ -264,3 +264,78 @@ class TestEndpointTools:
 
         with pytest.raises(ToolError, match="contactId"):
             asyncio.run(call())
+
+
+# ---------------------------------------------------------------------------
+# Path-parameter injection: ids come from CLI args and from MCP calls (a model),
+# so a value must never be able to change which endpoint is called.
+# ---------------------------------------------------------------------------
+
+
+class TestPathParameterSafety:
+    @pytest.mark.parametrize(
+        ("value", "encoded"),
+        [
+            (123, "123"),
+            (0, "0"),
+            ("3f2b8c1e-0000-4000-8000-000000000010", "3f2b8c1e-0000-4000-8000-000000000010"),
+            (
+                "../../settings/v2/tenant/1/employees",
+                "..%2F..%2Fsettings%2Fv2%2Ftenant%2F1%2Femployees",
+            ),
+            ("a/b", "a%2Fb"),
+            ("x?y=1#z", "x%3Fy%3D1%23z"),
+        ],
+    )
+    def test_path_segment_encodes_one_segment(self, value, encoded):
+        from st_cli.client import path_segment
+
+        assert path_segment(value) == encoded
+
+    @pytest.mark.parametrize("value", ["", ".", ".."])
+    def test_path_segment_rejects_dot_segments(self, value):
+        from st_cli.client import path_segment
+
+        with pytest.raises(UsageError):
+            path_segment(value)
+
+    def test_endpoint_tool_cannot_escape_its_path(self, deps, mcp_ctx, mock_client):
+        ep = Endpoint("get", "GET", "contacts/{contactId}/contact-methods/{contactMethodId}")
+        tool = engine._make_endpoint_tool("crm", ep, deps)
+        mock_client.get.return_value = {}
+        tool(mcp_ctx, path={"contactId": "../../../settings", "contactMethodId": "m"})
+        url = mock_client.get.call_args[0][1]
+        assert url == "contacts/..%2F..%2F..%2Fsettings/contact-methods/m"
+
+    def test_endpoint_tool_rejects_dot_dot(self, deps, mcp_ctx, mock_client):
+        ep = Endpoint("get", "GET", "technician-skills/{id}")
+        tool = engine._make_endpoint_tool("dispatch", ep, deps)
+        with pytest.raises(UsageError):
+            tool(mcp_ctx, path={"id": ".."})
+        mock_client.get.assert_not_called()
+
+    def test_cli_endpoint_encodes_args(self, invoke, mock_client):
+        mock_client.get.return_value = {"id": 1}
+        invoke(["dispatch", "skills-get", "../teams"], json_output=True)
+        assert mock_client.get.call_args[0][1] == "technician-skills/..%2Fteams"
+
+    def test_contacts_get_tool_encodes_id(self, mcp_ctx, mock_client):
+        from st_cli.mcp_server import st_crm_contacts_get
+
+        mock_client.get.return_value = {}
+        st_crm_contacts_get(mcp_ctx, contact_id="../customers/1")
+        mock_client.get.assert_called_once_with("crm", "contacts/..%2Fcustomers%2F1")
+
+    def test_contacts_get_tool_rejects_dot_dot(self, mcp_ctx, mock_client):
+        from st_cli.mcp_server import st_crm_contacts_get
+
+        with pytest.raises(ToolError, match="invalid path parameter"):
+            st_crm_contacts_get(mcp_ctx, contact_id="..")
+        mock_client.get.assert_not_called()
+
+    def test_report_tools_encode_category(self, mcp_ctx, mock_client):
+        from st_cli.mcp_server import st_reporting_report_fields
+
+        mock_client.get.return_value = {}
+        st_reporting_report_fields(mcp_ctx, category_id="a/../b", report_id="7")
+        assert mock_client.get.call_args[0][1] == "report-category/a%2F..%2Fb/reports/7"

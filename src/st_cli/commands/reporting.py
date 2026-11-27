@@ -7,6 +7,7 @@ from typing import Any, Optional
 
 import typer
 
+from st_cli.client import path_segment
 from st_cli.output import Column, console, render
 from st_cli.pagination import fetch_page
 
@@ -111,7 +112,7 @@ def reports_list(
     envelope = fetch_page(
         client,
         MODULE,
-        f"report-category/{category_id}/reports",
+        f"report-category/{path_segment(category_id)}/reports",
         page=page,
         page_size=page_size,
     )
@@ -132,7 +133,9 @@ def report_fields(
 ) -> None:
     """Show a report's fields and required parameters."""
     client = ctx.obj["client"]
-    meta = client.get(MODULE, f"report-category/{category_id}/reports/{report_id}")
+    meta = client.get(
+        MODULE, f"report-category/{path_segment(category_id)}/reports/{path_segment(report_id)}"
+    )
     as_json = ctx.obj["json"]
 
     if as_json:
@@ -206,7 +209,7 @@ def report_data(
         parameters.extend(json.loads(params))
 
     body: dict[str, Any] = {"parameters": parameters}
-    resource = f"report-category/{category_id}/reports/{report_id}/data"
+    resource = f"report-category/{path_segment(category_id)}/reports/{path_segment(report_id)}/data"
 
     if all_pages:
         all_fields: list[dict[str, Any]] = []
