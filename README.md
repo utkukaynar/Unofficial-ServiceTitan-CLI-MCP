@@ -79,6 +79,12 @@ April 15, 2026 at the time of writing). The clauses that matter most here:
 The full walkthrough is in **[docs/terms.md](docs/terms.md)**. It isn't legal
 advice; if your use case is unclear, ask ServiceTitan or your counsel.
 
+## License
+
+[MIT](LICENSE). The license covers **only this repository's client code**. It
+doesn't license, and grants no rights in, ServiceTitan's API, platform, or
+documentation — your use of those is governed by ServiceTitan's terms above.
+
 ## Quick start
 
 ```bash
