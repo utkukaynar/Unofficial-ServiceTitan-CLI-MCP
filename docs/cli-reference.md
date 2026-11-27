@@ -25,17 +25,21 @@ st crm locations-get   LOCATION_ID
 
 st crm bookings-list   [--page] [--page-size] [--all]
 st crm bookings-get    BOOKING_ID
-st crm bookings-create --data JSON
-st crm bookings-update BOOKING_ID --data JSON
 
 st crm contacts-list   [--page] [--page-size] [--all]
-st crm contacts-get    CONTACT_ID
+st crm contacts-get    CONTACT_ID            # a GUID string
 ```
 
-Generated additions: `customers-delete`, `locations-create/update/delete`,
-`contacts-create/update/delete`, `leads-*` (with `dismiss`/`follow-up`),
-`booking-provider-tags-*`, and `export-{customers,locations,bookings}`. See
-[API coverage → crm](api-coverage.md#crm).
+Bookings are created and updated **through a booking provider** — ServiceTitan
+has no tenant-level create/update — so those are the generated
+`provider-bookings-*` commands (`st crm provider-bookings-create PROVIDER_ID --data JSON`).
+
+Generated additions: `locations-create/update`, contacts CRUD and contact
+methods/preferences/relationships (`contacts-*`), customer and location notes,
+contacts and tags (`customers-notes-list`, `locations-contacts-create`,
+`customers-tag-add`, …), custom fields, `leads-*` (with `dismiss`/`follow-up`/
+`note`, plus `leads-create-v3`), `booking-provider-tags-*`, and export feeds
+including `export-customers-contacts`. See [API coverage → crm](api-coverage.md#crm).
 
 ## Jobs
 
@@ -57,10 +61,17 @@ st jobs projects-get  PROJECT_ID
 st jobs job-types-list   # moved here from `settings`
 ```
 
+`st jobs cancel JOB_ID --reason-id N --memo TEXT` cancels a job; reason IDs come
+from `st jobs job-cancel-reasons-list`.
+
 Generated additions include appointment lifecycle actions
-(`appointments-reschedule/hold/remove-hold/confirm/remove-confirmation`),
-`projects-create/update` (+ `note`, `attach-job`), `budget-codes-*`, and
-`export-{jobs,appointments,projects}`. See [API coverage → jobs](api-coverage.md#jobs).
+(`appointments-reschedule/hold/remove-hold/confirm/remove-confirmation/
+special-instructions/summary`), job notes, history, equipment and
+`job-remove-cancellation`, `projects-create/update/note` plus
+`projects-attach-job` / `projects-detach-job`, project daily logs, project
+statuses/sub-statuses/types, the work-breakdown-structure budget codes
+(`budget-codes-*`, `wbs-*`), and seven export feeds. See
+[API coverage → jobs](api-coverage.md#jobs).
 
 ## Dispatch
 
@@ -93,8 +104,10 @@ start/end, business units, total/open hours, and the `isAvailable` /
 `isExceedingIdealBookingPercentage` flags from the API.
 
 Generated additions: assignment actions (`assignments-assign-technicians` /
-`unassign-technicians`), full CRUD for shifts/zones/teams/events, `skills-*`,
-`arrival-windows-*` (+ `activate`), `business-hours-*`, and export feeds. See
+`unassign-technicians`), shifts (+ `shifts-bulk-delete`), zones, teams, events
+(non-job appointments — `events-replace` is a full PUT), `skills-*`,
+`arrival-windows-*` (+ `activate` and configuration), business hours,
+`technician-tracking`, GPS pings, and export feeds. See
 [API coverage → dispatch](api-coverage.md#dispatch).
 
 ## Accounting
@@ -103,7 +116,7 @@ Invoices, payments, GL accounts, journal entries, AP bills/credits/payments.
 
 ```bash
 st accounting invoices-list  [--status] [--range] [--from-date] [--to-date] [--page] [--page-size] [--all]
-st accounting invoices-get   INVOICE_ID
+st accounting invoices-get   INVOICE_ID     # ServiceTitan has no single-invoice route; filters the list by id
 
 st accounting payments-list  [--range] [--from-date] [--to-date] [--page] [--page-size] [--all]
 ```
@@ -112,11 +125,14 @@ st accounting payments-list  [--range] [--from-date] [--to-date] [--page] [--pag
 > — use `st salestech estimates-list` / `estimates-get`. The old
 > `accounting estimates-*` commands hit a non-existent endpoint and were removed.
 
-Generated additions: `invoices-update` / `invoices-mark-exported`,
-`payments-get/update/update-status`, `gl-accounts-*`, `journal-entries-*`,
-`credit-memos-*`, `ap-bills/ap-credits/ap-payments/inventory-bills-*`,
-`bank-deposits-*`, and read-only reference data (`payment-terms`,
-`payment-types`, `tax-zones`). See [API coverage → accounting](api-coverage.md#accounting).
+Generated additions: adjustment invoices (`invoices-create`), invoice items and
+tasks, `payments-update` / `payments-update-status`, `gl-accounts-*`,
+`journal-entries-*` (string IDs), `credit-memos-*`, AP bills/credits/payments,
+inventory bills, bank deposits, expense transactions, remittance vendors,
+`*-custom-fields` / `*-custom-fields-update` and `*-mark-exported` for every
+exportable record, reference data (`payment-terms`, `payment-types`,
+`tax-zones` + `tax-zones-resolve`), and export feeds. See
+[API coverage → accounting](api-coverage.md#accounting).
 
 ## Memberships
 
@@ -126,9 +142,11 @@ st memberships get        MEMBERSHIP_ID
 st memberships types-list [--page] [--page-size]
 ```
 
-Generated additions: `create`/`update`, `invoice-templates-*`,
+Generated additions: `update`, `memberships-sale`, status changes, custom
+fields, membership-type details (`membership-types-get`, discounts, billing
+options, included recurring services), `invoice-templates-*`,
 `recurring-services-*`, `recurring-service-events-*` (+ `mark-complete` /
-`mark-incomplete`), and export feeds. See
+`mark-incomplete`), and seven export feeds. See
 [API coverage → memberships](api-coverage.md#memberships).
 
 ## Reporting
@@ -159,16 +177,21 @@ st settings business-units-list [--active/--no-active] [--page] [--page-size] [-
 > `st jobs job-types-list`. The old `settings job-types-list` command hit a
 > non-existent endpoint and was removed.
 
-Generated additions: `business-units-update`, `employees-*` and `technicians-*`
-(each with `activate` / `deactivate`), `tag-types-*`, `user-roles-*`, and export
-feeds. See [API coverage → settings](api-coverage.md#settings).
+`st settings business-units-get BUSINESS_UNIT_ID` fetches one business unit.
+
+Generated additions: `business-units-update`, `business-units-intacct`,
+`employees-*` and `technicians-*` (each with `account-action` — `Activate`,
+`Deactivate`, `SendInvite`, `SendPasswordResetLink` — and custom fields),
+`tag-types-*`, `user-roles-list`, and export feeds. See
+[API coverage → settings](api-coverage.md#settings).
 
 ## Everything else (generated)
 
-The other 17 modules — pricebook, inventory, salestech, payroll, marketing,
-marketing-ads, timesheets, equipment-systems, findings, task-management, telecom,
-customer-interactions, forms, job-booking, marketing-reputation, scheduling-pro,
-service-agreements — are generated from the registry with uniform command names:
+The other 18 modules — pricebook, inventory, salestech, payroll, marketing,
+marketing-ads, timesheets, equipment-systems, findings, fleet-pro,
+task-management, telecom, customer-interactions, forms, job-booking,
+marketing-reputation, scheduling-pro, service-agreements — are generated from the
+registry with uniform command names:
 
 ```bash
 st <module> <resource>-list   [--filter key=value ...] [--range|--from-date|--to-date] [--page|--page-size|--all]
@@ -176,15 +199,21 @@ st <module> <resource>-get    RECORD_ID
 st <module> <resource>-create --data JSON
 st <module> <resource>-update RECORD_ID --data JSON
 st <module> <resource>-delete RECORD_ID
+st <module> <resource>-replace RECORD_ID --data JSON          # PUT endpoints
 st <module> <resource>-<action> [RECORD_ID] [--data JSON]   # domain actions
+st <module> <endpoint> [PATH_ARG ...] [--data JSON] [--filter key=value ...]   # path templates
 st <module> export-<feed>     [--from TOKEN] [--max N] [--all]   # change-feeds
 ```
+
+Endpoint-style commands cover nested paths, string IDs and bulk operations; their
+`--help` lists the path arguments in order, e.g.
+`st crm contacts-methods-get CONTACTID CONTACTMETHODID`.
 
 A few high-value examples:
 
 ```bash
 st salestech estimates-sell 12345 --data '{"soldBy": 99}'
-st inventory purchase-orders-approve 678
+st inventory purchase-order-requests-approve 678
 st pricebook services-create --data '{"code": "AC-TUNE", "displayName": "AC Tune-Up", "price": 129}'
 st jobs appointments-reschedule 555 --data '{"start": "2026-06-01T09:00:00", "end": "2026-06-01T11:00:00"}'
 st telecom export-calls --all --json

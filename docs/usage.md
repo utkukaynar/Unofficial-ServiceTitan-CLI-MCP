@@ -95,8 +95,8 @@ fetch only newer changes:
 
 ```bash
 st telecom export-calls --all --json        # drain the whole feed
-st jpm export-jobs --from "<token>"          # resume from a saved token
-st jpm export-jobs --max 500                 # stop after N records
+st jobs export-jobs --from "<token>"         # resume from a saved token
+st jobs export-jobs --max 500                # stop after N records
 ```
 
 ---

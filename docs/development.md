@@ -30,6 +30,7 @@ src/st_cli/
   output.py        Rich tables / JSON
   config.py        pydantic-settings (ST_* env vars)
   registry.py      declarative API spec (the single source of truth)
+  exceptions.py    error hierarchy (API, auth, config, usage errors)
   engine.py        generates CLI commands + MCP tools from the registry
   main.py          `st` Typer app — wires hand-written + generated groups
   mcp_server.py    `st-mcp` FastMCP server — bespoke tools + generated tools
@@ -51,7 +52,10 @@ how to add a resource.
 - **MCP** — engine tool factories are called directly with a mock context.
 - **Registry integrity** — `tests/test_registry.py` asserts unique names, valid
   ops/verbs, that no generated command shadows a hand-written one, and locks the
-  estimates→`salestech` / job-types→`jpm` routing fixes.
+  estimates→`sales` / job-types→`jpm` routing fixes.
+- **Spec conformance** — see below.
+- **Docs** — `tests/test_docs.py` fails if a doc page mentions an `st …` command
+  or `st_…` tool that doesn't exist.
 - `make_envelope()` builds ServiceTitan-style paginated responses;
   `time-machine` is available for date-dependent tests.
 
@@ -63,6 +67,28 @@ how to add a resource.
   `no-any-return` findings from `client.*` returning `Any`. It is **not** a
   passing gate today; keep new code consistent with the existing style rather
   than chasing those.
+
+## Spec conformance
+
+`tests/test_spec_conformance.py` checks the registry against ServiceTitan's own
+OpenAPI documents: every operation st-cli sends must exist (verb, module URL, API
+version), every spec operation must be exposed or explicitly listed as
+hand-written / intentionally omitted, list commands must target paginated
+endpoints, and date-filtered lists must accept their date keys and default sort.
+
+The documents are **not in the repo** — ServiceTitan's API Terms (§9.1) treat API
+documentation as confidential — so the test is skipped until you download them:
+
+1. Sign in at [developer.servicetitan.io](https://developer.servicetitan.io).
+2. Each API's OpenAPI document is served at
+   `https://developer.servicetitan.io/api/docs/apis/<api-id>` (e.g.
+   `tenant-crm`, `tenant-jpm-v2`; the ids are the slugs on the
+   [API list](https://developer.servicetitan.io/docs/apis)). Save each as
+   `specs/<api-id>.json`.
+3. `uv run python -m pytest tests/test_spec_conformance.py`.
+
+`specs/` is gitignored. When ServiceTitan adds endpoints, the coverage test fails
+and names them.
 
 ## Regenerating the coverage doc
 

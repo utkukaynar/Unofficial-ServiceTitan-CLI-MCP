@@ -1,6 +1,6 @@
 # Examples & recipes
 
-A broad sample of real commands across **all 24 ServiceTitan modules** — at least
+A broad sample of real commands across **all 25 ServiceTitan modules** — at least
 one endpoint per module, with realistic timeframes where the endpoint is
 date-filterable. Each block pairs the `st` CLI command with its `st-mcp` tool so
 you can use whichever interface fits.
@@ -16,7 +16,8 @@ Every generated command has an MCP twin. The mapping is mechanical:
 |-----|----------|----------|
 | `st pricebook services-list --filter active=true` | `st_pricebook_services_list` | `{"filters": {"active": true}}` |
 | `st telecom calls-list --range last-7-days` | `st_telecom_calls_list` | `{"date_range": "last-7-days"}` |
-| `st findings get 123` | `st_findings_get` | `{"record_id": 123}` |
+| `st findings location-findings-get 123` | `st_findings_location_findings_get` | `{"record_id": 123}` |
+| `st crm contacts-methods-get C_ID M_ID` | `st_crm_contacts_methods_get` | `{"path": {"contactId": "C_ID", "contactMethodId": "M_ID"}}` |
 | `st jobs export-jobs --from TOKEN` | `st_jpm_export_jobs` | `{"continue_from": "TOKEN"}` |
 
 Notes that hold throughout:
@@ -27,8 +28,12 @@ Notes that hold throughout:
 - **Timeframes:** `--range` accepts `today`, `last-7-days`, `this-month`,
   `last-quarter`, `2025-01-01:2025-03-31`, etc. (MCP: `date_range`). Only
   date-filterable endpoints honor it — they're called out below.
-- **MCP module ≠ CLI group in two spots:** the `jobs` CLI group is the `jpm`
-  module (`st_jpm_*`) and `estimates` live under `salestech` (`st_salestech_*`).
+- **Endpoint-style commands** (nested or string IDs, bulk operations) take their
+  path parameters positionally, in the order shown by `--help` (MCP: a `path`
+  dict keyed by parameter name).
+- **MCP module ≠ CLI group in three spots:** the `jobs` CLI group is the `jpm`
+  module (`st_jpm_*`), `salestech` is the `sales` module (`st_sales_*`), and
+  `job-booking` is `jbce` (`st_jbce_*`).
 
 ---
 
@@ -77,7 +82,8 @@ st dispatch who-busy --range this-week          # hand-tuned availability view
 st dispatch capacity --range this-week --bu-ids 1,2
 st dispatch zones-get 7
 st dispatch assignments-assign-technicians --data '{"jobAppointmentId":1,"technicianIds":[10,11]}'
-st dispatch arrival-windows-activate 3
+st dispatch arrival-windows-activate 3 --data '{"isActive": true}'
+st dispatch skills-get 6f1c…                    # technician-skill ids are strings
 ```
 
 MCP: `st_dispatch_zones_get {"record_id": 7}` ·
@@ -90,7 +96,8 @@ Sales below.)
 
 ```bash
 st accounting invoices-list --range last-month --status Posted   # hand-tuned filters
-st accounting payments-get 8800
+st accounting payments-update 8800 --data '{"memo":"Check #1042"}'
+st accounting invoices-mark-exported --data '[{"invoiceId":5521,"externalId":"QB-881"}]'
 st accounting gl-accounts-list --filter active=true
 st accounting journal-entries-list --range this-quarter
 st accounting export-invoices --all --json
@@ -105,11 +112,11 @@ Customer memberships, recurring services, invoice templates.
 ```bash
 st memberships list --filter status=Active --all
 st memberships recurring-services-list --filter locationId=321
-st memberships recurring-service-events-mark-complete 77
+st memberships recurring-service-events-mark-complete 77 --data '{"jobId":4567}'
 st memberships export-memberships --all
 ```
 
-MCP: `st_memberships_recurring_service_events_mark_complete {"record_id": 77}`
+MCP: `st_memberships_recurring_service_events_mark_complete {"record_id": 77, "data": {"jobId": 4567}}`
 
 ## Settings — `st settings` · `st_settings_*`
 
@@ -117,13 +124,13 @@ Employees, technicians, business units, tag types, user roles.
 
 ```bash
 st settings employees-list --filter active=true
-st settings technicians-deactivate 142
+st settings technicians-account-action 142 --data '{"action":"Deactivate"}'
 st settings tag-types-list
 st settings business-units-update 3 --data '{"name":"HVAC North"}'
 st settings export-technicians --all
 ```
 
-MCP: `st_settings_technicians_deactivate {"record_id": 142}`
+MCP: `st_settings_technicians_account_action {"record_id": 142, "data": {"action": "Deactivate"}}`
 
 ---
 
@@ -145,15 +152,16 @@ Purchase orders (date-filterable), receipts, returns, transfers, trucks, vendors
 
 ```bash
 st inventory purchase-orders-list --range this-month --filter businessUnitId=3
-st inventory purchase-orders-approve 4521
-st inventory receipts-cancel 880
+st inventory purchase-order-requests-list
+st inventory purchase-order-requests-approve 4521
+st inventory receipts-cancel 880 --data '{"canceledReason":"Duplicate"}'
 st inventory vendors-list --filter active=true
 st inventory export-purchase-orders --all
 ```
 
 MCP: `st_inventory_purchase_orders_list {"date_range": "this-month", "filters": {"businessUnitId": 3}}`
 
-## Sales & Estimates — `st salestech` · `st_salestech_*`
+## Sales & Estimates — `st salestech` · `st_sales_*`
 
 Estimates (date-filterable) and templates. **Estimates live here, not in
 accounting.**
@@ -166,19 +174,19 @@ st salestech estimate-templates-list
 st salestech export-estimates --all
 ```
 
-MCP: `st_salestech_estimates_list {"date_range": "last-30-days"}` ·
-`st_salestech_estimates_sell {"record_id": 33001, "data": {"soldBy": 10}}`
+MCP: `st_sales_estimates_list {"date_range": "last-30-days"}` ·
+`st_sales_estimates_sell {"record_id": 33001, "data": {"soldBy": 10}}`
 
 ## Payroll — `st payroll` · `st_payroll_*`
 
-Gross pay items (date-filterable), adjustments, settings, read-only payrolls.
+Gross pay items (date-filterable), adjustments, settings, payrolls, timesheets.
 
 ```bash
 st payroll gross-pay-items-list --range last-week
-st payroll payrolls-get 6001
-st payroll timesheets-list --filter employeeId=10
+st payroll employee-payrolls 10                 # payrolls for employee 10
+st payroll job-timesheets-for-job 4567
 st payroll activity-codes-list
-st payroll export-payrolls --all --json
+st payroll export-gross-pay-items --all --json
 ```
 
 MCP: `st_payroll_gross_pay_items_list {"date_range": "last-week"}`
@@ -201,10 +209,10 @@ Attribution and performance analytics (mostly read + attribution POSTs).
 ```bash
 st marketing-ads attributed-leads-list --filter fromUtc=2026-05-01
 st marketing-ads performance-list
-st marketing-ads external-call-attributions-post --data '{"callId":99,"campaignId":12}'
+st marketing-ads external-call-attributions-create --data '{"webSessionData":{…},"externalCallData":{…}}'
 ```
 
-MCP: `st_marketing_ads_external_call_attributions_post {"data": {...}}`
+MCP: `st_marketing_ads_external_call_attributions_create {"data": {...}}`
 
 ## Timesheets — `st timesheets` · `st_timesheets_*`
 
@@ -221,29 +229,39 @@ MCP: `st_timesheets_activities_list {"date_range": "this-week"}`
 
 ## Equipment Systems — `st equipment-systems` · `st_equipment_systems_*`
 
-Installed equipment and equipment types.
+Equipment systems, installed equipment, and equipment types. (ServiceTitan
+serves this module at `/equipmentsystems/` — the CLI handles that for you.)
 
 ```bash
 st equipment-systems installed-equipment-list --filter locationId=321
 st equipment-systems installed-equipment-get 5500
-st equipment-systems installed-equipment-attachment 5500 --data '{"url":"https://..."}'
+st equipment-systems add-equipment 77 --data '{"equipmentIds":[5500]}'
 st equipment-systems export-installed-equipment --all
 ```
 
 ## Findings — `st findings` · `st_findings_*`
 
-Findings and finding assets (`findings` is the module's primary resource → bare
-command names).
+Location findings, their attachments, and uploaded assets.
 
 ```bash
-st findings list --filter jobId=4567
-st findings get 123
-st findings create --data '{"jobId":4567,"summary":"Cracked heat exchanger"}'
-st findings attachment 123 --data '{"url":"https://..."}'
-st findings finding-assets-list
+st findings location-findings-list --filter locationId=321
+st findings location-findings-get 123
+st findings location-findings-create --data '{"locationId":321,"name":"Cracked heat exchanger"}'
+st findings location-findings-attachments-list 123
+st findings assets-upload --data '{"file":"<base64>"}'
 ```
 
-MCP: `st_findings_list {"filters": {"jobId": 4567}}` · `st_findings_get {"record_id": 123}`
+MCP: `st_findings_location_findings_list {"filters": {"locationId": 321}}` ·
+`st_findings_location_findings_attachments_list {"path": {"id": 123}}`
+
+## Fleet Pro — `st fleet-pro` · `st_fleet_pro_*`
+
+Vehicles and historical (older than 7 days) GPS and event data.
+
+```bash
+st fleet-pro vehicles-list
+st fleet-pro gps-history --data '{"startTime":"2026-10-01T00:00:00Z","endTime":"2026-10-02T00:00:00Z"}'
+```
 
 ## Task Management — `st task-management` · `st_task_management_*`
 
@@ -257,16 +275,19 @@ st task-management tasks-subtask 4040 --data '{"name":"Call vendor"}'
 
 ## Telecom — `st telecom` · `st_telecom_*`
 
-Calls (date-filterable, read + update).
+Calls (date-filterable), recordings, voicemail, and SMS opt-outs.
 
 ```bash
-st telecom calls-list --range last-7-days --all
+st telecom calls-list --range last-7-days --all    # v3 calls feed
 st telecom calls-get 778899
 st telecom calls-update 778899 --data '{"campaignId":12}'
+st telecom calls-recording 778899
+st telecom optouts-status --data '{"contactNumbers":["+15555550100"]}'
 st telecom export-calls --all --json
 ```
 
-MCP: `st_telecom_calls_list {"date_range": "last-7-days"}`
+MCP: `st_telecom_calls_list {"date_range": "last-7-days"}` ·
+`st_telecom_calls_get {"path": {"id": 778899}}`
 
 ## Customer Interactions — `st customer-interactions` · `st_customer_interactions_*`
 
@@ -282,9 +303,9 @@ st customer-interactions technician-ratings-create --data '{"jobId":4567,"techni
 Form definitions, submissions (read), job attachments.
 
 ```bash
-st forms forms-list
+st forms list
 st forms submissions-list --filter formId=15
-st forms job-attachments-upload --data '{"jobId":4567,"url":"https://..."}'
+st forms job-attachments-list 4567
 ```
 
 ## Job Booking — `st job-booking` · `st_jbce_*`
@@ -309,12 +330,12 @@ MCP: `st_marketing_reputation_reviews_list {"date_range": "last-month"}`
 
 ## Scheduling Pro — `st scheduling-pro` · `st_scheduling_pro_*`
 
-Schedulers and sessions (read-only).
+Schedulers, routers, their sessions and performance (read-only).
 
 ```bash
 st scheduling-pro schedulers-list
-st scheduling-pro schedulers-get 3
-st scheduling-pro sessions-list --filter schedulerId=3
+st scheduling-pro scheduler-sessions 8c1e…
+st scheduling-pro scheduler-performance 8c1e…
 ```
 
 ## Service Agreements — `st service-agreements` · `st_service_agreements_*`
