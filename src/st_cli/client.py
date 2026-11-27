@@ -4,12 +4,27 @@ from __future__ import annotations
 
 import time
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
 from st_cli.auth import TokenManager
 from st_cli.config import Settings
-from st_cli.exceptions import APIError, NotFoundError, RateLimitError
+from st_cli.exceptions import APIError, NotFoundError, RateLimitError, UsageError
+
+
+def path_segment(value: Any) -> str:
+    """Encode a caller-supplied id as exactly one URL path segment.
+
+    Ids reach the URL from CLI args and from MCP tool calls (i.e. from a model).
+    Percent-encoding ``/`` and rejecting ``.``/``..`` keeps a value like
+    ``../../settings/...`` from steering the request to a different endpoint.
+    """
+    text = str(value)
+    if text in ("", ".", ".."):
+        raise UsageError(f"invalid path parameter: {text!r}")
+    return quote(text, safe="")
+
 
 _MAX_RETRIES = 3
 _BACKOFF_BASE = 1.0  # seconds

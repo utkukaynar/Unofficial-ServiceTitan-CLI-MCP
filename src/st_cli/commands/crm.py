@@ -7,6 +7,7 @@ from typing import Optional
 
 import typer
 
+from st_cli.client import path_segment
 from st_cli.output import Column, render, render_single
 from st_cli.pagination import fetch_all, fetch_page
 
@@ -240,5 +241,5 @@ def contacts_get(
 ) -> None:
     """Get a single contact by ID."""
     client = ctx.obj["client"]
-    data = client.get(MODULE, f"contacts/{contact_id}")
+    data = client.get(MODULE, f"contacts/{path_segment(contact_id)}")
     render_single(data, CONTACT_COLUMNS, as_json=ctx.obj["json"])
