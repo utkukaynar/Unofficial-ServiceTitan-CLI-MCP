@@ -68,6 +68,8 @@ Both are fixed, and a test now keeps them fixed.
 - **[ServiceTitan API Terms](docs/terms.md)** page and README section: AI-agent
   disclosure and approval, 24-hour cache limit, credentials, rate limits,
   confidentiality, affiliation.
+- **MIT license** for this repository's client code (the license covers none of
+  ServiceTitan's API, platform, or documentation).
 
 ### Changed (breaking)
 

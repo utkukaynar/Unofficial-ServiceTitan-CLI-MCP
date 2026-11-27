@@ -74,10 +74,11 @@ publicise an integration with ServiceTitan without their written consent.
 ## Open-source licensing (§3.4)
 
 The terms prohibit using the APIs in a way that subjects the API or the
-ServiceTitan Platform to an open-source license. This repository contains client
-code only — no ServiceTitan API, platform code, or documentation — and currently
-carries no open-source license. If you fork or redistribute it, read this clause
-first.
+ServiceTitan Platform to an open-source license. This repository is MIT-licensed,
+and that license covers **only this repository's client code** — it contains no
+ServiceTitan API, platform code, or documentation, and grants nothing in them.
+Your access to the API is governed solely by ServiceTitan's terms. If you fork or
+redistribute this code, read this clause first.
 
 ## Security incidents (§7.2)
 
